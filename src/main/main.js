@@ -6,13 +6,14 @@ function createWindow() {
         width: 800,
         height: 600,
         webPreferences: {
-            preload: path.join(__dirname, 'preload.js'), // Dla bezpieczeństwa, ale na razie pusty
-            nodeIntegration: false, // Wyłącz dla bezpieczeństwa
-            contextIsolation: true, // Włącz izolację kontekstu
-        }
+            preload: path.join(__dirname, '../preload/preload.js'), // Ścieżka do preload.js
+            nodeIntegration: false, // Bezpieczeństwo
+            contextIsolation: true, // Bezpieczeństwo
+        },
+        icon: path.join(__dirname, '../../assets/icon.png'), // Ikona aplikacji
     });
 
-    win.loadFile('index.html');
+    win.loadFile(path.join(__dirname, '../renderer/index.html')); // Ścieżka do index.html
 }
 
 app.whenReady().then(createWindow);
