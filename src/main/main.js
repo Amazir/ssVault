@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');  // Dodaj dialog do wyboru plików
 const path = require('path');
 const VaultManager = require('./utils/vaultManager');
+const VaultHandler = require('./managers/vaultHandler');
 const { openVaultDB, closeCurrentDB } = require('./utils/db');
 const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('./utils/auth');
 
@@ -45,17 +46,15 @@ ipcMain.handle('get-vaults', () => {
 
 ipcMain.handle('create-vault', async (event, { name, password }) => {
     try {
-        const { filePath } = await dialog.showSaveDialog({ defaultPath: `${name}.vault.db` });
+        const { filePath } = await dialog.showSaveDialog({ defaultPath: `${name}.vault` });
         if (!filePath) return { error: 'Anulowano' };
-        openVaultDB(filePath, password);  // Teraz inicjuje tabele
-        await setMasterPasswordForVault(password);  // Tylko INSERT
+        const handler = new VaultHandler(filePath, password);
+        await handler.createVault();
         vaultMgr.addVault(name, filePath);
-        closeCurrentDB();
         return { success: true };
     } catch (err) {
-        console.error('Błąd tworzenia sejfu:', err);
-        closeCurrentDB();
-        return { error: 'Błąd tworzenia: ' + err.message };
+        console.error('Błąd w create-vault:', err);
+        return { error: 'Błąd tworzenia sejfu: ' + err.message };
     }
 });
 
@@ -69,18 +68,15 @@ ipcMain.handle('import-vault', async () => {
 });
 
 ipcMain.handle('open-vault', async (event, { path, password }) => {
-    try {
-        openVaultDB(path, password);
-        const isValid = await validateMasterPasswordForVault(password);
-        if (!isValid) {
-            closeCurrentDB();
-            return { error: 'Nieprawidłowe hasło' };
-        }
-        return { success: true };
-    } catch (err) {
-        closeCurrentDB();
-        return { error: err.message };
+    const handler = new VaultHandler(path, password);
+    await handler.openVault();
+    const isValid = await validateMasterPasswordForVault(password);
+    if (!isValid) {
+        handler.closeVault();
+        return { error: 'Nieprawidłowe hasło' };
     }
+    setCurrentSession(path, password, handler);  // Zapisz handler w sesji
+    return { success: true };
 });
 
 ipcMain.on('load-dashboard', () => {
