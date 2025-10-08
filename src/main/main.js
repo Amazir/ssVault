@@ -1,56 +1,90 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
-const { initDB, setDBKey } = require('./utils/db');
-const auth = require('./utils/auth');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');  // Dodaj dialog do wyboru plików
 const path = require('path');
+const VaultManager = require('./utils/vaultManager');
+const { openVaultDB, closeCurrentDB } = require('./utils/db');
+const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('./utils/auth');
+
+const vaultMgr = new VaultManager();  // Inicjuj
+console.log('VaultManager instancja:', vaultMgr);
 
 let mainWindow;
 
+// Creating an Electron window
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
-            preload: path.join(__dirname, '../main/preload.js'),
+            preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
-            contextIsolation: true, 
-        },
-        icon: path.join(__dirname, '../../assets/icon.png'), 
+            contextIsolation: true,
+            enableRemoteModule: false,
+            sandbox: true
+        }
     });
 
-    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/login.html')); // Start z login.html
-    initDB();
+    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/vaults.html'));  // Start z listą sejfów
 }
 
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
+    closeCurrentDB();
+    if (process.platform !== 'darwin') app.quit();
+});
+
+// IPC dla sejfów
+ipcMain.handle('get-vaults', () => {
+    try {
+        return vaultMgr.getVaults();
+    } catch (err) {
+        console.error('Błąd get-vaults:', err);
+        return [];  // Fallback pustej listy
     }
 });
 
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
-});
-
-ipcMain.handle('login', async (event, { masterPassword, isFirstTime }) => {
-    if (isFirstTime) {
-        // Ustaw nowe master password (np. przy pierwszej instalacji)
-        await auth.setMasterPassword(masterPassword);
-        setDBKey(masterPassword); // Odszyfruj/szyfruj DB
+ipcMain.handle('create-vault', async (event, { name, password }) => {
+    try {
+        const { filePath } = await dialog.showSaveDialog({ defaultPath: `${name}.vault.db` });
+        if (!filePath) return { error: 'Anulowano' };
+        openVaultDB(filePath, password);  // Teraz inicjuje tabele
+        await setMasterPasswordForVault(password);  // Tylko INSERT
+        vaultMgr.addVault(name, filePath);
+        closeCurrentDB();
         return { success: true };
-    } else {
-        const isValid = await auth.validateMasterPassword(masterPassword);
-        if (isValid) {
-            setDBKey(masterPassword);
-            return { success: true };
+    } catch (err) {
+        console.error('Błąd tworzenia sejfu:', err);
+        closeCurrentDB();
+        return { error: 'Błąd tworzenia: ' + err.message };
+    }
+});
+
+ipcMain.handle('import-vault', async () => {
+    const { filePaths } = await dialog.showOpenDialog({ filters: [{ name: 'Vaults', extensions: ['vault.db'] }] });
+    if (!filePaths || !filePaths[0]) return { error: 'Anulowano' };
+    const path = filePaths[0];
+    const name = path.basename(path, '.vault.db');
+    addVault(name, path);
+    return { success: true };
+});
+
+ipcMain.handle('open-vault', async (event, { path, password }) => {
+    try {
+        openVaultDB(path, password);
+        const isValid = await validateMasterPasswordForVault(password);
+        if (!isValid) {
+            closeCurrentDB();
+            return { error: 'Nieprawidłowe hasło' };
         }
-        return { success: false, error: 'Nieprawidłowe hasło' };
+        return { success: true };
+    } catch (err) {
+        closeCurrentDB();
+        return { error: err.message };
     }
 });
 
 ipcMain.on('load-dashboard', () => {
     mainWindow.loadFile(path.join(__dirname, '../renderer/pages/dashboard.html'));
 });
+
+// IPC dla haseł itd. (jak wcześniej, używaj getCurrentDB())

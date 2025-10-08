@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Sejfy - ssVault</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../css/styles.css">
+<!--    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">-->
+</head>
+<body>
+<div class="container mt-5">
+    <h1>Sejfy</h1>
+    <button id="createBtn" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">Stwórz nowy</button>
+    <button id="importBtn" class="btn btn-secondary">Importuj</button>
+    <table class="table mt-3">
+        <thead><tr><th>Nazwa</th><th>Ścieżka</th><th>Akcje</th></tr></thead>
+        <tbody id="vaultList"></tbody>
+    </table>
+</div>
+
+<!-- Modal dla create -->
+<div class="modal fade" id="createModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Stwórz nowy sejf</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createForm">
+                    <div class="mb-3">
+                        <label for="vaultName" class="form-label">Nazwa sejfu</label>
+                        <input type="text" class="form-control" id="vaultName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vaultPassword" class="form-label">Master password</label>
+                        <input type="password" class="form-control" id="vaultPassword" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                <button type="button" class="btn btn-primary" id="createSubmit">Utwórz</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="../js/vaults.js"></script>
+</body>
+</html>

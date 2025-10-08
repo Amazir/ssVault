@@ -1,19 +1,38 @@
 const bcrypt = require('bcrypt');
-const fs = require('fs');
-const path = require('path');
+const { getCurrentDB } = require('./db');
 
 const saltRounds = 10;
-const hashFile = path.join(__dirname, '../../../secure-hash.txt'); // Lokalny plik z hashem (bezpieczny, lokalny)
 
-async function setMasterPassword(password) {
+async function setMasterPasswordForVault(password) {
+    const db = getCurrentDB();
     const hash = await bcrypt.hash(password, saltRounds);
-    fs.writeFileSync(hashFile, hash);
+    return new Promise((resolve, reject) => {
+        db.run('INSERT OR REPLACE INTO auth (id, master_hash) VALUES (1, ?)', [hash], (err) => {
+            if (err) {
+                console.error('Błąd INSERT auth:', err);  // Debug
+                reject(err);
+            } else {
+                console.log('Hash master zapisany');  // Debug
+                resolve();
+            }
+        });
+    });
 }
 
-async function validateMasterPassword(password) {
-    if (!fs.existsSync(hashFile)) return false;
-    const hash = fs.readFileSync(hashFile, 'utf-8');
-    return await bcrypt.compare(password, hash);
+async function validateMasterPasswordForVault(password) {
+    const db = getCurrentDB();
+    return new Promise((resolve) => {
+        db.get('SELECT master_hash FROM auth WHERE id = 1', async (err, row) => {
+            if (err) {
+                console.error('Błąd SELECT auth:', err);  // Debug
+                resolve(false);
+            }
+            if (!row) resolve(false);
+            const match = await bcrypt.compare(password, row.master_hash);
+            console.log('Walidacja master:', match);  // Debug
+            resolve(match);
+        });
+    });
 }
 
-module.exports = { setMasterPassword, validateMasterPassword };
+module.exports = { setMasterPasswordForVault, validateMasterPasswordForVault };
