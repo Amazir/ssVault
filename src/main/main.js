@@ -1,5 +1,4 @@
 const { app } = require('electron');
-const path = require('path');
 const { createWindow } = require('./core/app');
 const { registerVaultIpcHandlers } = require('./ipc/vaultIpc');
 
@@ -7,7 +6,9 @@ const VaultManager = require('./utils/vaultManager');
 global.vaultMgr = new VaultManager();
 
 app.whenReady().then(() => {
-    createWindow();
+    const mainWindow = createWindow();
+
+    registerVaultIpcHandlers(mainWindow);
     registerVaultIpcHandlers();
 });
 

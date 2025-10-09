@@ -1,10 +1,11 @@
 const { ipcMain, dialog } = require('electron');
+const path = require('path');
 const VaultHandler = require('../handlers/vaultHandler');
 const { openVaultDB, closeCurrentDB } = require('../utils/db');
 const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('../utils/auth');
 const { setCurrentSession, getCurrentSessionHandler, clearSession } = require('../utils/session');
 
-function registerVaultIpcHandlers() {
+function registerVaultIpcHandlers(mainWindow) {
     ipcMain.handle('get-vaults', () => {
         try {
             return global.vaultMgr.getVaults();
@@ -29,27 +30,33 @@ function registerVaultIpcHandlers() {
     });
 
     ipcMain.handle('import-vault', async () => {
-        const { filePaths } = await dialog.showOpenDialog({ filters: [{ name: 'Vaults', extensions: ['vault.db'] }] });
+        const { filePaths } = await dialog.showOpenDialog({ filters: [{ name: 'Vaults', extensions: ['vault'] }] });
         if (!filePaths || !filePaths[0]) return { error: 'Anulowano' };
         const filePath = filePaths[0];
-        const name = path.basename(filePath, '.vault.db');
-        global.vaultMgr.addVault(name, filePath);  // Poprawione z addVault
+        const name = path.basename(filePath, '.vault');
+        global.vaultMgr.addVault(name, filePath);
         return { success: true };
     });
 
-    ipcMain.handle('open-vault', async (event, { path, password }) => {
+    ipcMain.handle('open-vault', async (event, { vaultPath, password }) => {
         try {
-            const handler = new VaultHandler(path, password);
+            const handler = new VaultHandler(vaultPath, password);
+
             await handler.openVault();
+
+            const dbPath = path.join(handler.tempDir, 'metadata.db');
+            openVaultDB(dbPath, password);
+
             const isValid = await validateMasterPasswordForVault(password);
             if (!isValid) {
                 handler.cleanTempDir();
                 return { error: 'Nieprawidłowe hasło' };
             }
-            setCurrentSession(path, password, handler);
-            await openVaultDB();  // Jeśli potrzeba
+
+            setCurrentSession(vaultPath, password, handler);
             return { success: true };
         } catch (err) {
+            console.error('Błąd open-vault:', err);
             return { error: err.message };
         }
     });
@@ -64,7 +71,9 @@ function registerVaultIpcHandlers() {
     });
 
     ipcMain.on('load-dashboard', () => {
-        mainWindow.loadFile(path.join(__dirname, '../../renderer/pages/dashboard.html'));
+        if (mainWindow) {
+            mainWindow.loadFile(path.join(__dirname, '../../renderer/pages/dashboard.html'));
+        }
     });
 }
 

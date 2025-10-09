@@ -68,7 +68,7 @@ document.addEventListener('click', (e) => {
             const password = document.getElementById('openPassword').value;
             const path = document.getElementById('openPath').value;
             if (password) {
-                const response = await window.api.openVault({ path, password });
+                const response = await window.api.openVault({ vaultPath: path, password });
                 if (response.success) {
                     window.api.loadDashboard();
                 } else {
