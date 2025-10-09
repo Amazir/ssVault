@@ -1,8 +1,11 @@
+// Get vaults from main process and insert into table
 async function loadVaults() {
     if (!window.api || typeof window.api.getVaults !== 'function') {
         console.error('API getVaults not available');
         return;
     }
+
+
     const vaults = await window.api.getVaults();
     const list = document.getElementById('vaultList');
     list.innerHTML = '';
@@ -19,7 +22,7 @@ async function loadVaults() {
     });
 }
 
-// Create - użyj modal zamiast prompt
+// Create new vault form
 document.getElementById('createSubmit').addEventListener('click', async () => {
     const name = document.getElementById('vaultName').value;
     const password = document.getElementById('vaultPassword').value;
@@ -34,17 +37,18 @@ document.getElementById('createSubmit').addEventListener('click', async () => {
     }
 });
 
-// Import
+
+// Import vault
 document.getElementById('importBtn').addEventListener('click', async () => {
     const response = await window.api.importVault();
     if (response.success) loadVaults();
 });
 
-// Open i remove (jak wcześniej)
+// Open vault
 document.addEventListener('click', async (e) => {
     if (e.target.classList.contains('openBtn')) {
         const path = e.target.dataset.path;
-        const password = prompt('Master password dla sejfu:');  // Tu nadal prompt - zmień na modal jeśli chcesz
+        const password = prompt('Master password dla sejfu:');
         if (password) {
             const response = await window.api.openVault({ path, password });
             if (response.success) window.api.loadDashboard();

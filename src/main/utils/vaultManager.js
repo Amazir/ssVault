@@ -1,16 +1,16 @@
 let ElectronStore;
 try {
-    ElectronStore = require('electron-store').default;  // Dodaj .default dla ESM
+    ElectronStore = require('electron-store').default;
 } catch (err) {
     console.error('Błąd electron-store:', err);
-    ElectronStore = null;  // Fallback
+    ElectronStore = null;
 }
 
 class VaultManager {
     constructor() {
         this.store = new ElectronStore({
-            name: 'app-vaults',  // Zmienione na bardziej specyficzne
-            encryptionKey: 'your-secret-key'  // Dodaj własny klucz dla bezpieczeństwa config
+            name: 'app-vaults',
+            encryptionKey: 'your-secret-key'
         });
     }
 

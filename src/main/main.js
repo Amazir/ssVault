@@ -1,86 +1,21 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');  // Dodaj dialog do wyboru plików
+const { app } = require('electron');
 const path = require('path');
+const { createWindow } = require('./core/app');
+const { registerVaultIpcHandlers } = require('./ipc/vaultIpc');
+
 const VaultManager = require('./utils/vaultManager');
-const VaultHandler = require('./managers/vaultHandler');
-const { openVaultDB, closeCurrentDB } = require('./utils/db');
-const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('./utils/auth');
+global.vaultMgr = new VaultManager();
 
-const vaultMgr = new VaultManager();  // Inicjuj
-console.log('VaultManager instancja:', vaultMgr);
-
-let mainWindow;
-
-// Creating an Electron window
-function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            nodeIntegration: false,
-            contextIsolation: true,
-            enableRemoteModule: false,
-            sandbox: true
-        }
-    });
-
-    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/vaults.html'));  // Start z listą sejfów
-}
-
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createWindow();
+    registerVaultIpcHandlers();
+});
 
 app.on('window-all-closed', () => {
-    closeCurrentDB();
     if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC dla sejfów
-ipcMain.handle('get-vaults', () => {
-    try {
-        return vaultMgr.getVaults();
-    } catch (err) {
-        console.error('Błąd get-vaults:', err);
-        return [];  // Fallback pustej listy
-    }
+app.on('will-quit', () => {
+    const { closeCurrentDB } = require('./utils/db');
+    closeCurrentDB();
 });
-
-ipcMain.handle('create-vault', async (event, { name, password }) => {
-    try {
-        const { filePath } = await dialog.showSaveDialog({ defaultPath: `${name}.vault` });
-        if (!filePath) return { error: 'Anulowano' };
-        const handler = new VaultHandler(filePath, password);
-        await handler.createVault();
-        vaultMgr.addVault(name, filePath);
-        return { success: true };
-    } catch (err) {
-        console.error('Błąd w create-vault:', err);
-        return { error: 'Błąd tworzenia sejfu: ' + err.message };
-    }
-});
-
-ipcMain.handle('import-vault', async () => {
-    const { filePaths } = await dialog.showOpenDialog({ filters: [{ name: 'Vaults', extensions: ['vault.db'] }] });
-    if (!filePaths || !filePaths[0]) return { error: 'Anulowano' };
-    const path = filePaths[0];
-    const name = path.basename(path, '.vault.db');
-    addVault(name, path);
-    return { success: true };
-});
-
-ipcMain.handle('open-vault', async (event, { path, password }) => {
-    const handler = new VaultHandler(path, password);
-    await handler.openVault();
-    const isValid = await validateMasterPasswordForVault(password);
-    if (!isValid) {
-        handler.closeVault();
-        return { error: 'Nieprawidłowe hasło' };
-    }
-    setCurrentSession(path, password, handler);  // Zapisz handler w sesji
-    return { success: true };
-});
-
-ipcMain.on('load-dashboard', () => {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/pages/dashboard.html'));
-});
-
-// IPC dla haseł itd. (jak wcześniej, używaj getCurrentDB())
