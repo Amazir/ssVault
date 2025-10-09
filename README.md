@@ -9,10 +9,3 @@ Aplikacja desktopowa do bezpiecznego przechowywania plików z szyfrowaniem i pro
 ## Uruchomienie
 1. Zainstaluj zależności: `npm install`
 2. Uruchom aplikację: `npm start`
-
-## Struktura
-- `src/main/` - Logika backendowa (proces główny)
-- `src/renderer/` - Interfejs użytkownika
-- `src/preload/` - Skrypty preload
-- `src/common/` - Wspólne moduły
-- `assets/` - Statyczne zasoby
