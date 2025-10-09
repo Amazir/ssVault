@@ -8,13 +8,8 @@ async function setMasterPasswordForVault(password) {
     const hash = await bcrypt.hash(password, saltRounds);
     return new Promise((resolve, reject) => {
         db.run('INSERT OR REPLACE INTO auth (id, master_hash) VALUES (1, ?)', [hash], (err) => {
-            if (err) {
-                console.error('Błąd INSERT auth:', err);  // Debug
-                reject(err);
-            } else {
-                console.log('Hash master zapisany');  // Debug
-                resolve();
-            }
+            if (err) reject(err);
+            else resolve();
         });
     });
 }
@@ -24,13 +19,16 @@ async function validateMasterPasswordForVault(password) {
     return new Promise((resolve) => {
         db.get('SELECT master_hash FROM auth WHERE id = 1', async (err, row) => {
             if (err) {
-                console.error('Błąd SELECT auth:', err);  // Debug
+                console.error('Błąd SELECT auth:', err);
                 resolve(false);
             }
-            if (!row) resolve(false);
-            const match = await bcrypt.compare(password, row.master_hash);
-            console.log('Walidacja master:', match);  // Debug
-            resolve(match);
+            if (!row || !row.master_hash) {  // Dodaj check na undefined or no hash
+                console.log('Brak rekordu auth – pierwszy start?');
+                resolve(false);
+            } else {
+                const match = await bcrypt.compare(password, row.master_hash);
+                resolve(match);
+            }
         });
     });
 }

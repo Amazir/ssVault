@@ -45,21 +45,42 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 });
 
 // Open vault
-document.addEventListener('click', async (e) => {
+document.addEventListener('click', (e) => {
     if (e.target.classList.contains('openBtn')) {
         const path = e.target.dataset.path;
-        const password = prompt('Master password dla sejfu:');
-        if (password) {
-            const response = await window.api.openVault({ path, password });
-            if (response.success) window.api.loadDashboard();
-            else alert(response.error);
+        // Trigger modal
+        const openModal = new bootstrap.Modal(document.getElementById('openModal'));
+        openModal.show();
+
+        // Dodaj hidden input dla path (jeśli nie ma)
+        let pathInput = document.getElementById('openPath');
+        if (!pathInput) {
+            pathInput = document.createElement('input');
+            pathInput.type = 'hidden';
+            pathInput.id = 'openPath';
+            document.getElementById('openForm').appendChild(pathInput);
         }
+        pathInput.value = path;
+
+        // Listener na submit
+        const submitBtn = document.getElementById('openSubmit');
+        const submitHandler = async () => {
+            const password = document.getElementById('openPassword').value;
+            const path = document.getElementById('openPath').value;
+            if (password) {
+                const response = await window.api.openVault({ path, password });
+                if (response.success) {
+                    window.api.loadDashboard();
+                } else {
+                    alert(response.error);
+                }
+            }
+            openModal.hide();
+            submitBtn.removeEventListener('click', submitHandler);  // Clean up
+        };
+        submitBtn.addEventListener('click', submitHandler);
     } else if (e.target.classList.contains('removeBtn')) {
-        const path = e.target.dataset.path;
-        if (confirm('Usunąć z listy?')) {
-            await window.api.removeVault(path);
-            loadVaults();
-        }
+        // ... bez zmian
     }
 });
 

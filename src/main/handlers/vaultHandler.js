@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const sqlite3 = require('@journeyapps/sqlcipher').verbose();
-
+const { setMasterPasswordForVault } = require('../utils/auth');  // Dodaj to
 const { openVaultDB, closeCurrentDB } = require('../utils/db');
 
 class VaultHandler {
@@ -20,11 +20,10 @@ class VaultHandler {
         if (fs.existsSync(this.tempDir)) {
             try {
                 fs.rmSync(this.tempDir, { recursive: true, force: true });
-                console.log('Temp dir wyczyszczony');  // Debug
             } catch (err) {
                 if (err.code === 'EBUSY') {
-                    console.log('EBUSY - czekam 500ms');  // Opóźnienie dla Windows
-                    setTimeout(() => fs.rmSync(this.tempDir, { recursive: true, force: true }), 500);
+                    console.log('EBUSY - czekam 1000ms');
+                    setTimeout(() => fs.rmSync(this.tempDir, { recursive: true, force: true }), 1000);
                 } else {
                     console.error('Błąd czyszczenia temp:', err);
                 }
@@ -32,9 +31,26 @@ class VaultHandler {
         }
     }
 
+    async openVault() {
+        try {
+            const encryptedData = fs.readFileSync(this.vaultPath, 'utf-8');  // Dodaj 'utf-8' dla armored text
+            const decryptedZipBuffer = await this.decryptWithGPG(encryptedData);
+            const zip = new AdmZip(Buffer.from(decryptedZipBuffer, 'binary'));  // Konwertuj do Buffer dla ZIP
+            zip.extractAllTo(this.tempDir, true);
+            console.log('ZIP wyekstrahowany do temp');
+            const dbPath = path.join(this.tempDir, 'metadata.db');
+            if (!fs.existsSync(dbPath)) throw new Error('metadata.db not found in vault');
+            openVaultDB(dbPath, this.password);
+            console.log('DB otwarty z sejfu');
+        } catch (err) {
+            console.error('Błąd openVault:', err);
+            this.cleanTempDir();
+            throw err;
+        }
+    }
     async createVault() {
         try {
-            const dbPath = this.createEmptyDB();
+            const dbPath = this.createEmptyDB();  // Teraz z key i hash
             if (!fs.existsSync(dbPath)) throw new Error('DB not created');
             console.log('DB istnieje:', dbPath);
             const zip = new AdmZip();
@@ -51,47 +67,34 @@ class VaultHandler {
         }
     }
 
-
-
     createEmptyDB() {
         const dbPath = path.join(this.tempDir, 'metadata.db');
-        try {
-            const db = new sqlite3.Database(dbPath, (err) => {
-                if (err) throw err;
-            });
+        const db = new sqlite3.Database(dbPath, (err) => {
+            if (err) throw err;
+        });
+        db.run(`PRAGMA key = '${this.password}'`, (err) => {
+            if (err) throw err;
+            console.log('Key set');
             db.serialize(() => {
-                db.run('CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, master_hash TEXT)');
-                db.run('CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)');
-                // Dummy insert to force file creation
-                db.run('INSERT OR IGNORE INTO auth (id) VALUES (1)');
+                db.run('CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, master_hash TEXT)', (err) => {
+                    if (err) throw err;
+                    console.log('Table auth created');
+                });
+                db.run('CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)', (err) => {
+                    if (err) throw err;
+                    console.log('Table passwords created');
+                });
             });
-            db.close((err) => {
-                if (err) console.error('Błąd zamknięcia DB:', err);
-                else console.log('DB zamknięty:', dbPath);
-            });
-        } catch (err) {
-            console.error('Błąd inicjalizacji DB:', err);
-            throw err;
-        }
+            // INSERT hash po CREATE
+            setMasterPasswordForVault(this.password).then(() => {
+                console.log('Hash inserted');
+            }).catch(err => console.error('Błąd set hash:', err));
+        });
+        db.close((err) => {
+            if (err) console.error('Błąd zamknięcia DB:', err);
+            else console.log('DB zamknięty:', dbPath);
+        });
         return dbPath;
-    }
-
-    async openVault() {
-        try {
-            const encryptedData = fs.readFileSync(this.vaultPath);
-            const decryptedZipBuffer = await this.decryptWithGPG(encryptedData);
-            const zip = new AdmZip(decryptedZipBuffer);
-            zip.extractAllTo(this.tempDir, true);
-            console.log('ZIP wyekstrahowany do temp');
-            const dbPath = path.join(this.tempDir, 'metadata.db');
-            if (!fs.existsSync(dbPath)) throw new Error('metadata.db not found in vault');
-            openVaultDB(dbPath, this.password);  // Otwórz szyfrowaną DB
-            console.log('DB otwarty z sejfu');
-        } catch (err) {
-            console.error('Błąd openVault:', err);
-            this.cleanTempDir();
-            throw err;
-        }
     }
 
     async closeVault() {
@@ -107,7 +110,7 @@ class VaultHandler {
 
     async encryptWithGPG(data) {
         const message = await openpgp.createMessage({ binary: data });
-        return await openpgp.encrypt({ message, passwords: [this.password] });
+        return await openpgp.encrypt({ message, passwords: [this.password], format: 'armored' });  // Dodaj format: 'armored' dla text
     }
 
     async decryptWithGPG(encrypted) {
