@@ -50,6 +50,7 @@ class VaultHandler {
         }
     }
 
+	// Creating empty databse for new vault
     createEmptyDB() {
         const dbPath = path.join(this.tempDir, 'metadata.db');
         const db = new sqlite3.Database(dbPath);
