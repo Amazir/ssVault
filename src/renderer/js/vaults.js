@@ -5,10 +5,14 @@ async function loadVaults() {
         return;
     }
 
-
+	// Get vaults from server
     const vaults = await window.api.getVaults();
+    
+    // Get vault list object from html and clear it
     const list = document.getElementById('vaultList');
     list.innerHTML = '';
+    
+    // Add table rows with functionality for ever vault user have imported
     vaults.forEach(v => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
