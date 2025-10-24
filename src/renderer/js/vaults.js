@@ -28,16 +28,23 @@ async function loadVaults() {
 
 // Create new vault form
 document.getElementById('createSubmit').addEventListener('click', async () => {
+    
+    // Get name and password values from HTML
     const name = document.getElementById('vaultName').value;
     const password = document.getElementById('vaultPassword').value;
+    
+    // Check if name and password are provided
     if (name && password) {
+        
+        // Try to create vault (init authentication)
         const response = await window.api.createVault({ name, password });
+        
+        // If password matches the vault, if not throw error
         if (response.success) {
             bootstrap.Modal.getInstance(document.getElementById('createModal')).hide();
             loadVaults();
-        } else {
+        } else
             alert(response.error);
-        }
     }
 });
 
@@ -51,12 +58,15 @@ document.getElementById('importBtn').addEventListener('click', async () => {
 // Open vault
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('openBtn')) {
+        
+        // Get vault path
         const path = e.target.dataset.path;
-        // Trigger modal
+        
+        // Create and show modal from Bootstrap
         const openModal = new bootstrap.Modal(document.getElementById('openModal'));
         openModal.show();
 
-        // Dodaj hidden input dla path (jeśli nie ma)
+        // Create hidden input with vault path
         let pathInput = document.getElementById('openPath');
         if (!pathInput) {
             pathInput = document.createElement('input');
@@ -66,25 +76,36 @@ document.addEventListener('click', (e) => {
         }
         pathInput.value = path;
 
-        // Listener na submit
+        // Get submit button from html and init handler for submit
         const submitBtn = document.getElementById('openSubmit');
         const submitHandler = async () => {
+            
+            // Get vaults password and path
             const password = document.getElementById('openPassword').value;
             const path = document.getElementById('openPath').value;
+            
+            // If user provided password
             if (password) {
+                
+                // Authenticate 
                 const response = await window.api.openVault({ vaultPath: path, password });
-                if (response.success) {
+                
+                // If auth is successfull then open dashboard, else throw the error
+                if (response.success)
                     window.api.loadDashboard();
-                } else {
+                else 
                     alert(response.error);
-                }
             }
+            
+            // Hide vault opener modal
             openModal.hide();
-            submitBtn.removeEventListener('click', submitHandler);  // Clean up
+            
+            // Clean up event listener
+            submitBtn.removeEventListener('click', submitHandler); 
         };
         submitBtn.addEventListener('click', submitHandler);
     } else if (e.target.classList.contains('removeBtn')) {
-        // ... bez zmian
+        // TODO: Handling removing vaults
     }
 });
 
