@@ -19,8 +19,8 @@ async function loadVaults() {
       <td>${v.name}</td>
       <td>${v.path}</td>
       <td>
-        <button class="btn btn-sm btn-success openBtn" data-path="${v.path}">Otwórz</button>
-        <button class="btn btn-sm btn-danger removeBtn" data-path="${v.path}">Usuń</button>
+        <button class="btn btn-sm btn-success openBtn" data-path="${v.path}">Open</button>
+        <button class="btn btn-sm btn-danger removeBtn" data-path="${v.path}">Remove</button>
       </td>`;
         list.appendChild(tr);
     });

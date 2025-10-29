@@ -19,11 +19,11 @@ async function validateMasterPasswordForVault(password) {
     return new Promise((resolve) => {
         db.get('SELECT master_hash FROM auth WHERE id = 1', async (err, row) => {
             if (err) {
-                console.error('Błąd SELECT auth:', err);
+                console.error('SELECT auth error:', err);
                 resolve(false);
             }
-            if (!row || !row.master_hash) {  // Dodaj check na no hash
-                console.log('Brak rekordu auth – pierwszy start?');
+            if (!row || !row.master_hash) {  // Add check when there is no hash
+                console.log('No auth record – first start?');
                 resolve(false);
             } else {
                 const match = await bcrypt.compare(password, row.master_hash);

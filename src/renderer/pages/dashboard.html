@@ -9,44 +9,50 @@
     </head>
     <body>
     <div class="container mt-5">
-        <h1>Panel Zarządzania</h1>
+        <h1>Management Panel</h1>
         <ul class="nav nav-tabs" id="dashboardTabs">
-            <li class="nav-item"><a class="nav-link active" href="#passwords" data-bs-toggle="tab">Hasła</a></li>
-            <li class="nav-item"><a class="nav-link" href="#files" data-bs-toggle="tab">Pliki</a></li>
-            <li class="nav-item"><a class="nav-link" href="#gpg" data-bs-toggle="tab">Klucze GPG</a></li>
+            <li class="nav-item"><a class="nav-link active" href="#passwords" data-bs-toggle="tab">Passwords</a></li>
+            <li class="nav-item"><a class="nav-link" href="#files" data-bs-toggle="tab">Files</a></li>
+            <li class="nav-item"><a class="nav-link" href="#gpg" data-bs-toggle="tab">GPG Keys</a></li>
         </ul>
         <div class="tab-content mt-3">
             <div class="tab-pane active" id="passwords">
+                <div class="d-flex justify-content-end mb-2">
+                    <button class="btn btn-primary add-btn" data-type="password">Add new</button>
+                </div>
                 <table class="table table-bordered">
                     <thead>
                     <tr>
-                        <th>Nazwa</th>
-                        <th>Hasło</th>
-                        <th class="text-end"><button class="btn btn-sm btn-primary add-btn" data-type="password">+</button></th>
+                        <th>Name</th>
+                        <th>Password</th>
                     </tr>
                     </thead>
                     <tbody id="passwords-body"></tbody>
                 </table>
             </div>
             <div class="tab-pane" id="files">
+                <div class="d-flex justify-content-end mb-2">
+                    <button class="btn btn-primary add-btn" data-type="file">Add new</button>
+                </div>
                 <table class="table table-bordered">
                     <thead>
                     <tr>
-                        <th>Nazwa pliku</th>
-                        <th>Ścieżka</th>
-                        <th class="text-end"><button class="btn btn-sm btn-primary add-btn" data-type="file">+</button></th>
+                        <th>File name</th>
+                        <th>Path</th>
                     </tr>
                     </thead>
                     <tbody id="files-body"></tbody>
                 </table>
             </div>
             <div class="tab-pane" id="gpg">
+                <div class="d-flex justify-content-end mb-2">
+                    <button class="btn btn-primary add-btn" data-type="gpg">Add new</button>
+                </div>
                 <table class="table table-bordered">
                     <thead>
                     <tr>
-                        <th>Nazwa klucza</th>
-                        <th>Typ</th>
-                        <th class="text-end"><button class="btn btn-sm btn-primary add-btn" data-type="gpg">+</button></th>
+                        <th>Key name</th>
+                        <th>Type</th>
                     </tr>
                     </thead>
                     <tbody id="gpg-body"></tbody>
@@ -55,27 +61,27 @@
         </div>
     </div>
 
-    <!-- Modal do dodawania (ogólny, dostosuj type) -->
+    <!-- Add modal (generic, adapts by type) -->
     <div class="modal fade" id="addModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="addTitle">Dodaj nowy</h5>
+                    <h5 class="modal-title" id="addTitle">Add new</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="addForm">
                         <input type="hidden" id="addType">
                         <div class="mb-3">
-                            <label for="addName" class="form-label">Nazwa</label>
+                            <label for="addName" class="form-label">Name</label>
                             <input type="text" class="form-control" id="addName" required>
                         </div>
-                        <div class="mb-3" id="addExtra"></div>  <!-- Dynamiczne dla hasła/pliku/gpg -->
+                        <div class="mb-3" id="addExtra"></div>  <!-- Dynamic for password/file/gpg -->
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
-                    <button type="button" class="btn btn-primary" id="addSubmit">Dodaj</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="addSubmit">Add</button>
                 </div>
             </div>
         </div>

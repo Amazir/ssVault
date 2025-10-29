@@ -2,7 +2,7 @@ let ElectronStore;
 try {
     ElectronStore = require('electron-store').default;
 } catch (err) {
-    console.error('Błąd electron-store:', err);
+    console.error('electron-store error:', err);
     ElectronStore = null;
 }
 

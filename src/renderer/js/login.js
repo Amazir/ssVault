@@ -4,8 +4,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     const isFirstTime = document.getElementById('isFirstTime').checked;
     const response = await window.api.login({ masterPassword, isFirstTime });
     if (response.success) {
-        window.api.loadDashboard(); // Przejdź do dashboard
+        window.api.loadDashboard(); // Go to dashboard
     } else {
-        document.getElementById('error').textContent = response.error || 'Błąd logowania';
+        document.getElementById('error').textContent = response.error || 'Login error';
     }
 });

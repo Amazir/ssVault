@@ -24,10 +24,10 @@ class VaultHandler {
                 fs.rmSync(this.tempDir, { recursive: true, force: true });
             } catch (err) {
                 if (err.code === 'EBUSY') {
-                    console.log('EBUSY - czekam 2000ms');
+                    console.log('EBUSY - waiting 2000ms');
                     setTimeout(() => fs.rmSync(this.tempDir, { recursive: true, force: true }), 2000);
                 } else {
-                    console.error('Błąd czyszczenia temp:', err);
+                    console.error('Temp cleanup error:', err);
                 }
             }
         }
@@ -37,15 +37,15 @@ class VaultHandler {
         try {
             const dbPath = await this.createEmptyDB();
             if (!fs.existsSync(dbPath)) throw new Error('DB not created');
-            console.log('DB istnieje:', dbPath);
+            console.log('DB exists:', dbPath);
             const zip = new AdmZip();
             zip.addLocalFile(dbPath);
             const zipBuffer = zip.toBuffer();
             const encryptedZip = await this.encryptWithGPG(zipBuffer);
             fs.writeFileSync(this.vaultPath, encryptedZip);
-            console.log('Sejf utworzony:', this.vaultPath);
+            console.log('Vault created:', this.vaultPath);
         } catch (err) {
-            console.error('Błąd createVault:', err);
+            console.error('createVault error:', err);
             throw err;
         } finally {
             this.cleanTempDir();
@@ -76,14 +76,14 @@ class VaultHandler {
                                 console.log('Table passwords created');
                                 // Ensure all changes flushed and DB closed before resolving
                                 db.run('PRAGMA wal_checkpoint = TRUNCATE', (chkErr) => {
-                                    if (chkErr) console.error('Błąd checkpoint:', chkErr);
+                                    if (chkErr) console.error('Checkpoint error:', chkErr);
                                     console.log('Checkpoint done');
                                     db.close((closeErr) => {
                                         if (closeErr) {
-                                            console.error('Błąd zamknięcia DB:', closeErr);
+                                            console.error('DB close error:', closeErr);
                                             return reject(closeErr);
                                         }
-                                        console.log('DB zamknięty:', dbPath);
+                                        console.log('DB closed:', dbPath);
                                         resolve(dbPath);
                                     });
                                 });
@@ -95,7 +95,7 @@ class VaultHandler {
         });
     }
 
-    /** -------------------- Otwieranie istniejącego sejfu -------------------- */
+    /** -------------------- Opening existing vault -------------------- */
     async openVault() {
         try {
             const encryptedData = fs.readFileSync(this.vaultPath); // Buffer
@@ -103,21 +103,21 @@ class VaultHandler {
 
             const zip = new AdmZip(decryptedZipBuffer);
             zip.extractAllTo(this.tempDir, true);
-            console.log('ZIP wyekstrahowany do temp');
+            console.log('ZIP extracted to temp');
 
             const dbPath = path.join(this.tempDir, 'metadata.db');
-            if (!fs.existsSync(dbPath)) throw new Error('metadata.db nie znaleziony w sejfie');
+            if (!fs.existsSync(dbPath)) throw new Error('metadata.db not found in vault');
 
             openVaultDB(dbPath, this.password);
-            console.log('DB otwarty z sejfu');
+            console.log('DB opened from vault');
         } catch (err) {
-            console.error('Błąd openVault:', err);
+            console.error('openVault error:', err);
             this.cleanTempDir();
             throw err;
         }
     }
 
-    /** -------------------- Zamknięcie sejfu -------------------- */
+    /** -------------------- Closing vault -------------------- */
     async closeVault() {
         await closeCurrentDB();
 
@@ -126,7 +126,7 @@ class VaultHandler {
         const zipBuffer = zip.toBuffer();
 
         const encryptedZip = await this.encryptWithGPG(zipBuffer);
-        fs.writeFileSync(this.vaultPath, encryptedZip); // zapisujemy binary
+        fs.writeFileSync(this.vaultPath, encryptedZip); // write binary
 
         this.cleanTempDir();
     }
@@ -139,7 +139,7 @@ class VaultHandler {
             passwords: [this.password],
             format: 'binary', // binary
         });
-        return Buffer.from(encrypted); // zwracamy Buffer
+        return Buffer.from(encrypted); // return Buffer
     }
 
     async decryptWithGPG(encryptedBuffer) {
