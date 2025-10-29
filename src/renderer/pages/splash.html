@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Loading… - ssVault</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #1e1e1e; color: #e6e6e6; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+      .center {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .spinner {
+        width: 48px; height: 48px;
+        border: 4px solid rgba(255,255,255,0.15);
+        border-top-color: #4da3ff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .subtitle { opacity: 0.8; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <div class="center">
+      <div class="spinner" aria-hidden="true"></div>
+      <div>Starting ssVault…</div>
+      <div class="subtitle">Please wait while we prepare things</div>
+    </div>
+  </body>
+</html>
