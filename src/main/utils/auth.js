@@ -22,7 +22,7 @@ async function validateMasterPasswordForVault(password) {
                 console.error('Błąd SELECT auth:', err);
                 resolve(false);
             }
-            if (!row) {
+            if (!row || !row.master_hash) {  // Dodaj check na no hash
                 console.log('Brak rekordu auth – pierwszy start?');
                 resolve(false);
             } else {

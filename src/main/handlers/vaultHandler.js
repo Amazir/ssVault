@@ -23,24 +23,26 @@ class VaultHandler {
             try {
                 fs.rmSync(this.tempDir, { recursive: true, force: true });
             } catch (err) {
-                console.error('Błąd czyszczenia temp:', err);
+                if (err.code === 'EBUSY') {
+                    console.log('EBUSY - czekam 2000ms');
+                    setTimeout(() => fs.rmSync(this.tempDir, { recursive: true, force: true }), 2000);
+                } else {
+                    console.error('Błąd czyszczenia temp:', err);
+                }
             }
         }
     }
 
-    /** -------------------- Tworzenie nowego sejfu -------------------- */
     async createVault() {
         try {
-            const dbPath = this.createEmptyDB();
-            if (!fs.existsSync(dbPath)) throw new Error('DB nie została utworzona');
-
+            const dbPath = await this.createEmptyDB();
+            if (!fs.existsSync(dbPath)) throw new Error('DB not created');
+            console.log('DB istnieje:', dbPath);
             const zip = new AdmZip();
             zip.addLocalFile(dbPath);
             const zipBuffer = zip.toBuffer();
-
             const encryptedZip = await this.encryptWithGPG(zipBuffer);
-            fs.writeFileSync(this.vaultPath, encryptedZip); // zapisujemy binary
-
+            fs.writeFileSync(this.vaultPath, encryptedZip);
             console.log('Sejf utworzony:', this.vaultPath);
         } catch (err) {
             console.error('Błąd createVault:', err);
@@ -50,29 +52,47 @@ class VaultHandler {
         }
     }
 
-	// Creating empty databse for new vault
     createEmptyDB() {
         const dbPath = path.join(this.tempDir, 'metadata.db');
-        const db = new sqlite3.Database(dbPath);
-
-        db.serialize(() => {
-            db.run(`PRAGMA key = '${this.password}'`);
-            console.log('Key ustawiony');
-
-            db.run('CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, master_hash TEXT)');
-            const hash = bcrypt.hashSync(this.password, saltRounds);
-            db.run('INSERT OR REPLACE INTO auth (id, master_hash) VALUES (1, ?)', [hash]);
-            console.log('Hash master inserted');
-
-            db.run('CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)');
+        return new Promise((resolve, reject) => {
+            const db = new sqlite3.Database(dbPath, (err) => {
+                if (err) return reject(err);
+            });
+            db.run(`PRAGMA key = '${this.password}'`, (err) => {
+                if (err) return reject(err);
+                console.log('Key set');
+                db.run('PRAGMA synchronous = OFF', (err) => {
+                    if (err) return reject(err);
+                    console.log('Synchronous off');
+                    db.run('CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, master_hash TEXT)', (err) => {
+                        if (err) return reject(err);
+                        console.log('Table auth created');
+                        const hash = bcrypt.hashSync(this.password, saltRounds);
+                        db.run('INSERT OR REPLACE INTO auth (id, master_hash) VALUES (1, ?)', [hash], (err) => {
+                            if (err) return reject(err);
+                            console.log('Hash inserted');
+                            db.run('CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)', (err) => {
+                                if (err) return reject(err);
+                                console.log('Table passwords created');
+                                // Ensure all changes flushed and DB closed before resolving
+                                db.run('PRAGMA wal_checkpoint = TRUNCATE', (chkErr) => {
+                                    if (chkErr) console.error('Błąd checkpoint:', chkErr);
+                                    console.log('Checkpoint done');
+                                    db.close((closeErr) => {
+                                        if (closeErr) {
+                                            console.error('Błąd zamknięcia DB:', closeErr);
+                                            return reject(closeErr);
+                                        }
+                                        console.log('DB zamknięty:', dbPath);
+                                        resolve(dbPath);
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
         });
-
-        db.close(err => {
-            if (err) console.error('Błąd zamknięcia DB:', err);
-            else console.log('DB zamknięty:', dbPath);
-        });
-
-        return dbPath;
     }
 
     /** -------------------- Otwieranie istniejącego sejfu -------------------- */
@@ -99,7 +119,7 @@ class VaultHandler {
 
     /** -------------------- Zamknięcie sejfu -------------------- */
     async closeVault() {
-        closeCurrentDB();
+        await closeCurrentDB();
 
         const zip = new AdmZip();
         zip.addLocalFolder(this.tempDir);
