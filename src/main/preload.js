@@ -14,5 +14,7 @@ contextBridge.exposeInMainWorld('api', {
     // Dashboard IPC
     getData: (tabId) => ipcRenderer.invoke('get-data', tabId),
     addItem: (payload) => ipcRenderer.invoke('add-item', payload),
+    updatePassword: (payload) => ipcRenderer.invoke('update-password', payload),
+    deletePassword: (id) => ipcRenderer.invoke('delete-password', id),
     manualSave: () => ipcRenderer.invoke('manual-save')
 });

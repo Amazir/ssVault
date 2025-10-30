@@ -6,6 +6,43 @@ const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('.
 const { setCurrentSession, getCurrentSessionHandler, clearSession } = require('../utils/session');
 
 function registerVaultIpcHandlers(mainWindow) {
+    // Helpers to DRY table/columns ensuring and sealing
+    async function ensureBaseTables(db) {
+        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)", () => res()));
+        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, name TEXT, path TEXT)", () => res()));
+        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS gpg (id INTEGER PRIMARY KEY, name TEXT, type TEXT)", () => res()));
+    }
+    async function ensurePasswordColumns(db) {
+        const existingCols = await new Promise((resolve) => {
+            db.all("PRAGMA table_info(passwords)", (err, rows) => resolve(rows || []));
+        });
+        const have = (name) => existingCols.some(c => c.name === name);
+        const alters = [];
+        if (!have('label')) alters.push("ALTER TABLE passwords ADD COLUMN label TEXT");
+        if (!have('group_name')) alters.push("ALTER TABLE passwords ADD COLUMN group_name TEXT");
+        if (!have('address')) alters.push("ALTER TABLE passwords ADD COLUMN address TEXT");
+        if (!have('username')) alters.push("ALTER TABLE passwords ADD COLUMN username TEXT");
+        for (const sql of alters) {
+            await new Promise((res) => db.run(sql, () => res()));
+        }
+    }
+    async function flushAndSeal() {
+        const db = getCurrentDB();
+        if (db) {
+            await new Promise((res) => db.run('PRAGMA wal_checkpoint(TRUNCATE)', () => res()));
+            await new Promise((res) => db.run('PRAGMA optimize', () => res()));
+        }
+        try {
+            const handler = getCurrentSessionHandler();
+            if (handler) {
+                await handler.sealVault();
+            }
+        } catch (err) {
+            // Bubble up to let caller log if needed
+            throw err;
+        }
+    }
+
     ipcMain.handle('get-vaults', () => {
         try {
             return global.vaultMgr.getVaults();
@@ -98,24 +135,11 @@ function registerVaultIpcHandlers(mainWindow) {
         if (!db) return [];
 
         // Ensure base tables lazily
-        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)", () => res()));
-        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, name TEXT, path TEXT)", () => res()));
-        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS gpg (id INTEGER PRIMARY KEY, name TEXT, type TEXT)", () => res()));
+        await ensureBaseTables(db);
 
         // Ensure extended columns for passwords
         if (tabId === 'passwords') {
-            const existingCols = await new Promise((resolve) => {
-                db.all("PRAGMA table_info(passwords)", (err, rows) => resolve(rows || []));
-            });
-            const have = (name) => existingCols.some(c => c.name === name);
-            const alters = [];
-            if (!have('label')) alters.push("ALTER TABLE passwords ADD COLUMN label TEXT");
-            if (!have('group_name')) alters.push("ALTER TABLE passwords ADD COLUMN group_name TEXT");
-            if (!have('address')) alters.push("ALTER TABLE passwords ADD COLUMN address TEXT");
-            if (!have('username')) alters.push("ALTER TABLE passwords ADD COLUMN username TEXT");
-            for (const sql of alters) {
-                await new Promise((res) => db.run(sql, () => res()));
-            }
+            await ensurePasswordColumns(db);
         }
 
         if (tabId === 'passwords') {
@@ -154,24 +178,13 @@ function registerVaultIpcHandlers(mainWindow) {
         if (!payload || !payload.type) return { success: false, error: 'Missing required fields.' };
 
         // Ensure base tables lazily
-        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)", () => res()));
-        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, name TEXT, path TEXT)", () => res()));
-        await new Promise((res) => db.run("CREATE TABLE IF NOT EXISTS gpg (id INTEGER PRIMARY KEY, name TEXT, type TEXT)", () => res()));
+        await ensureBaseTables(db);
 
         let stmt = null;
         let params = [];
         if (payload.type === 'password') {
             // Ensure extended columns exist
-            const existingCols = await new Promise((resolve) => db.all("PRAGMA table_info(passwords)", (err, rows) => resolve(rows || [])));
-            const have = (name) => existingCols.some(c => c.name === name);
-            const alters = [];
-            if (!have('label')) alters.push("ALTER TABLE passwords ADD COLUMN label TEXT");
-            if (!have('group_name')) alters.push("ALTER TABLE passwords ADD COLUMN group_name TEXT");
-            if (!have('address')) alters.push("ALTER TABLE passwords ADD COLUMN address TEXT");
-            if (!have('username')) alters.push("ALTER TABLE passwords ADD COLUMN username TEXT");
-            for (const sql of alters) {
-                await new Promise((res) => db.run(sql, () => res()));
-            }
+            await ensurePasswordColumns(db);
             const { label, group, address, username, password } = payload;
             if (!label || !password) return { success: false, error: 'Label and Password are required.' };
             // Keep legacy 'name' in sync by storing label there too
@@ -196,19 +209,82 @@ function registerVaultIpcHandlers(mainWindow) {
                     return resolve({ success: false, error: err.message });
                 }
                 // Flush and auto-seal
-                db.run('PRAGMA wal_checkpoint(TRUNCATE)', async () => {
-                    db.run('PRAGMA optimize', async () => {
-                        try {
-                            const handler = getCurrentSessionHandler();
-                            if (handler) {
-                                await handler.sealVault();
-                            }
-                        } catch (sealErr) {
-                            console.error('Auto-save (seal) after add-item failed:', sealErr);
-                        }
-                        resolve({ success: true, id: this && this.lastID });
-                    });
-                });
+                (async () => {
+                    try {
+                        await flushAndSeal();
+                    } catch (sealErr) {
+                        console.error('Auto-save (seal) after add-item failed:', sealErr);
+                    }
+                    resolve({ success: true, id: this && this.lastID });
+                })();
+            });
+        });
+    });
+
+    // Update an existing password entry
+    ipcMain.handle('update-password', async (event, payload) => {
+        const db = getCurrentDB();
+        if (!db) return { success: false, error: 'No open vault/database.' };
+        if (!payload || typeof payload.id !== 'number') return { success: false, error: 'Missing id.' };
+
+        // Ensure table/columns exist (defensive)
+        await ensureBaseTables(db);
+        await ensurePasswordColumns(db);
+
+        const fields = [];
+        const params = [];
+        if (payload.label != null) { fields.push('label = ?'); params.push(payload.label); }
+        if (payload.group != null) { fields.push('group_name = ?'); params.push(payload.group); }
+        if (payload.address != null) { fields.push('address = ?'); params.push(payload.address); }
+        if (payload.username != null) { fields.push('username = ?'); params.push(payload.username); }
+        if (payload.password != null) { fields.push('password = ?'); params.push(payload.password); }
+        // keep legacy name in sync with label if label provided
+        if (payload.label != null) { fields.push('name = ?'); params.push(payload.label); }
+
+        if (fields.length === 0) return { success: false, error: 'No fields to update.' };
+        params.push(payload.id);
+
+        const stmt = `UPDATE passwords SET ${fields.join(', ')} WHERE id = ?`;
+        return new Promise((resolve) => {
+            db.run(stmt, params, function(err) {
+                if (err) {
+                    console.error('update-password error:', err);
+                    return resolve({ success: false, error: err.message });
+                }
+                (async () => {
+                    try {
+                        await flushAndSeal();
+                    } catch (sealErr) {
+                        console.error('Auto-save (seal) after update-password failed:', sealErr);
+                    }
+                    resolve({ success: true, changes: this && this.changes });
+                })();
+            });
+        });
+    });
+
+    // Delete a password by id
+    ipcMain.handle('delete-password', async (event, id) => {
+        const db = getCurrentDB();
+        if (!db) return { success: false, error: 'No open vault/database.' };
+        if (typeof id !== 'number') return { success: false, error: 'Invalid id.' };
+
+        await ensureBaseTables(db);
+        const stmt = 'DELETE FROM passwords WHERE id = ?';
+        return new Promise((resolve) => {
+            db.run(stmt, [id], function(err) {
+                if (err) {
+                    console.error('delete-password error:', err);
+                    return resolve({ success: false, error: err.message });
+                }
+                (async () => {
+                    try {
+                        await flushAndSeal();
+                    } catch (sealErr) {
+                        console.error('Auto-save (seal) after delete-password failed:', sealErr);
+                    }
+                    resolve({ success: true, changes: this && this.changes });
+                })();
             });
         });
     });

@@ -71,7 +71,8 @@ app.on('before-quit', async (event) => {
 
 // Handle windows close as app exit 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
+    // Quit the app on all platforms when all windows are closed
+    app.quit();
 });
 
 // Fallback: close DB if nothing else handled it

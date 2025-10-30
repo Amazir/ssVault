@@ -4,24 +4,32 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
-    icon: '/src/resources/images/icon/icon'
+    // Use relative path without leading slash; Electron Forge will resolve from project root
+    icon: 'src/resources/images/icon/icon'
   },
   rebuildConfig: {},
   makers: [
+    // Windows installer (Squirrel)
     {
       name: '@electron-forge/maker-squirrel',
+      platforms: ['win32'],
       config: {},
     },
+    // Zip artifacts for all platforms
     {
       name: '@electron-forge/maker-zip',
-      platforms: ['darwin'],
+      platforms: ['darwin', 'win32', 'linux'],
     },
+    // Linux DEB
     {
       name: '@electron-forge/maker-deb',
+      platforms: ['linux'],
       config: {},
     },
+    // Linux RPM
     {
       name: '@electron-forge/maker-rpm',
+      platforms: ['linux'],
       config: {},
     },
   ],
