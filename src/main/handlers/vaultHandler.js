@@ -9,6 +9,10 @@ const { openVaultDB, closeCurrentDB } = require('../utils/db');
 
 const saltRounds = 10;
 
+function escapeForSqlite(str) {
+    return String(str).replace(/'/g, "''");
+}
+
 class VaultHandler {
     constructor(vaultPath, password) {
         this.vaultPath = vaultPath;
@@ -16,6 +20,20 @@ class VaultHandler {
         this.tempDir = path.join(os.tmpdir(), 'ssVault-temp');
         this.cleanTempDir();
         if (!fs.existsSync(this.tempDir)) fs.mkdirSync(this.tempDir, { recursive: true });
+    }
+
+    /** Seal current temp DB back into the vault file without closing DB or cleaning temp dir */
+    async sealVault() {
+        const dbPath = path.join(this.tempDir, 'metadata.db');
+        if (!fs.existsSync(dbPath)) {
+            throw new Error('metadata.db not found during sealVault');
+        }
+        const zip = new AdmZip();
+        zip.addLocalFile(dbPath);
+        const zipBuffer = zip.toBuffer();
+        const encryptedZip = await this.encryptWithGPG(zipBuffer);
+        fs.writeFileSync(this.vaultPath, encryptedZip);
+        return true;
     }
 
     cleanTempDir() {
@@ -58,33 +76,38 @@ class VaultHandler {
             const db = new sqlite3.Database(dbPath, (err) => {
                 if (err) return reject(err);
             });
-            db.run(`PRAGMA key = '${this.password}'`, (err) => {
+            const safeKey = escapeForSqlite(this.password);
+            db.run(`PRAGMA key = '${safeKey}'`, (err) => {
                 if (err) return reject(err);
                 console.log('Key set');
-                db.run('PRAGMA synchronous = OFF', (err) => {
-                    if (err) return reject(err);
-                    console.log('Synchronous off');
-                    db.run('CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, master_hash TEXT)', (err) => {
-                        if (err) return reject(err);
-                        console.log('Table auth created');
-                        const hash = bcrypt.hashSync(this.password, saltRounds);
-                        db.run('INSERT OR REPLACE INTO auth (id, master_hash) VALUES (1, ?)', [hash], (err) => {
+                // Use durable settings so we always package real data into the vault
+                db.get('PRAGMA journal_mode = DELETE', (jmErr) => {
+                    if (jmErr) console.warn('PRAGMA journal_mode set error:', jmErr);
+                    db.run('PRAGMA synchronous = FULL', (syncErr) => {
+                        if (syncErr) return reject(syncErr);
+                        console.log('Synchronous FULL');
+                        db.run('CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, master_hash TEXT)', (err) => {
                             if (err) return reject(err);
-                            console.log('Hash inserted');
-                            db.run('CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)', (err) => {
+                            console.log('Table auth created');
+                            const hash = bcrypt.hashSync(this.password, saltRounds);
+                            db.run('INSERT OR REPLACE INTO auth (id, master_hash) VALUES (1, ?)', [hash], (err) => {
                                 if (err) return reject(err);
-                                console.log('Table passwords created');
-                                // Ensure all changes flushed and DB closed before resolving
-                                db.run('PRAGMA wal_checkpoint = TRUNCATE', (chkErr) => {
-                                    if (chkErr) console.error('Checkpoint error:', chkErr);
-                                    console.log('Checkpoint done');
-                                    db.close((closeErr) => {
-                                        if (closeErr) {
-                                            console.error('DB close error:', closeErr);
-                                            return reject(closeErr);
-                                        }
-                                        console.log('DB closed:', dbPath);
-                                        resolve(dbPath);
+                                console.log('Hash inserted');
+                                db.run('CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)', (err) => {
+                                    if (err) return reject(err);
+                                    console.log('Table passwords created');
+                                    // Ensure all changes flushed and DB closed before resolving
+                                    db.run('PRAGMA wal_checkpoint(TRUNCATE)', (chkErr) => {
+                                        if (chkErr) console.warn('Checkpoint error:', chkErr);
+                                        console.log('Checkpoint done');
+                                        db.close((closeErr) => {
+                                            if (closeErr) {
+                                                console.error('DB close error:', closeErr);
+                                                return reject(closeErr);
+                                            }
+                                            console.log('DB closed:', dbPath);
+                                            resolve(dbPath);
+                                        });
                                     });
                                 });
                             });
@@ -108,7 +131,7 @@ class VaultHandler {
             const dbPath = path.join(this.tempDir, 'metadata.db');
             if (!fs.existsSync(dbPath)) throw new Error('metadata.db not found in vault');
 
-            openVaultDB(dbPath, this.password);
+            await openVaultDB(dbPath, this.password);
             console.log('DB opened from vault');
         } catch (err) {
             console.error('openVault error:', err);
@@ -121,12 +144,23 @@ class VaultHandler {
     async closeVault() {
         await closeCurrentDB();
 
+        // Only include the SQLite file to avoid temp artifacts
+        const dbPath = path.join(this.tempDir, 'metadata.db');
+        if (!fs.existsSync(dbPath)) {
+            throw new Error('metadata.db not found during closeVault');
+        }
+
+        const beforeSize = fs.existsSync(this.vaultPath) ? fs.statSync(this.vaultPath).size : 0;
+
         const zip = new AdmZip();
-        zip.addLocalFolder(this.tempDir);
+        zip.addLocalFile(dbPath);
         const zipBuffer = zip.toBuffer();
 
         const encryptedZip = await this.encryptWithGPG(zipBuffer);
         fs.writeFileSync(this.vaultPath, encryptedZip); // write binary
+
+        const afterSize = fs.statSync(this.vaultPath).size;
+        console.log(`Vault sealed. Size: ${beforeSize} -> ${afterSize} bytes`);
 
         this.cleanTempDir();
     }

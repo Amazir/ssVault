@@ -13,5 +13,6 @@ contextBridge.exposeInMainWorld('api', {
     removeVault: (path) => ipcRenderer.invoke('remove-vault', path),
     // Dashboard IPC
     getData: (tabId) => ipcRenderer.invoke('get-data', tabId),
-    addItem: (payload) => ipcRenderer.invoke('add-item', payload)
+    addItem: (payload) => ipcRenderer.invoke('add-item', payload),
+    manualSave: () => ipcRenderer.invoke('manual-save')
 });

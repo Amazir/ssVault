@@ -9,31 +9,31 @@
     </head>
     <body>
     <div class="container mt-5">
-        <h1>Management Panel</h1>
-        <ul class="nav nav-tabs" id="dashboardTabs">
+        <h1 class="mb-0">Management Panel</h1>
+        <ul class="nav nav-tabs mt-3" id="dashboardTabs">
             <li class="nav-item"><a class="nav-link active" href="#passwords" data-bs-toggle="tab">Passwords</a></li>
             <li class="nav-item"><a class="nav-link" href="#files" data-bs-toggle="tab">Files</a></li>
             <li class="nav-item"><a class="nav-link" href="#gpg" data-bs-toggle="tab">GPG Keys</a></li>
         </ul>
         <div class="tab-content mt-3">
             <div class="tab-pane active" id="passwords">
-                <div class="d-flex justify-content-end mb-2">
-                    <button class="btn btn-primary add-btn" data-type="password">Add new</button>
-                </div>
                 <table class="table table-bordered">
                     <thead>
                     <tr>
-                        <th>Name</th>
+                        <th>Label</th>
+                        <th>Group</th>
+                        <th>Address</th>
+                        <th>Username/E-Mail</th>
                         <th>Password</th>
                     </tr>
                     </thead>
                     <tbody id="passwords-body"></tbody>
                 </table>
+                <div class="d-flex justify-content-end mt-2">
+                    <button class="btn btn-primary add-btn" data-type="password">Add new</button>
+                </div>
             </div>
             <div class="tab-pane" id="files">
-                <div class="d-flex justify-content-end mb-2">
-                    <button class="btn btn-primary add-btn" data-type="file">Add new</button>
-                </div>
                 <table class="table table-bordered">
                     <thead>
                     <tr>
@@ -43,11 +43,11 @@
                     </thead>
                     <tbody id="files-body"></tbody>
                 </table>
+                <div class="d-flex justify-content-end mt-2">
+                    <button class="btn btn-primary add-btn" data-type="file">Add new</button>
+                </div>
             </div>
             <div class="tab-pane" id="gpg">
-                <div class="d-flex justify-content-end mb-2">
-                    <button class="btn btn-primary add-btn" data-type="gpg">Add new</button>
-                </div>
                 <table class="table table-bordered">
                     <thead>
                     <tr>
@@ -57,6 +57,9 @@
                     </thead>
                     <tbody id="gpg-body"></tbody>
                 </table>
+                <div class="d-flex justify-content-end mt-2">
+                    <button class="btn btn-primary add-btn" data-type="gpg">Add new</button>
+                </div>
             </div>
         </div>
     </div>
