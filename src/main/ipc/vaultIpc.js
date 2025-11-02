@@ -4,15 +4,14 @@ const VaultHandler = require('../handlers/vaultHandler');
 const { openVaultDB, closeCurrentDB, getCurrentDB } = require('../utils/db');
 const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('../utils/auth');
 const { setCurrentSession, getCurrentSessionHandler, clearSession, getCurrentVaultPath } = require('../utils/session');
-const dbx = require('../utils/dbAccess');
+const { run, get, all, ensureBaseTables, ensurePasswordColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, getGroups, addGroup, deleteGroup } = require('../utils/db');
 
 function registerVaultIpcHandlers(mainWindow) {
-    // Use centralized DB helpers from utils/dbAccess
     async function flushAndSeal() {
         const db = getCurrentDB();
         if (db) {
-            try { await dbx.checkpoint(db); } catch (_) {}
-            try { await dbx.optimize(db); } catch (_) {}
+            try { await checkpoint(db); } catch (_) {}
+            try { await optimize(db); } catch (_) {}
         }
         const handler = getCurrentSessionHandler();
         if (handler) {
@@ -91,7 +90,7 @@ function registerVaultIpcHandlers(mainWindow) {
         try {
             const db = getCurrentDB();
             if (db) {
-                try { await dbx.checkpoint(db); } catch (_) {}
+                try { await checkpoint(db); } catch (_) {}
             }
             const handler = getCurrentSessionHandler();
             if (!handler) return { success: false, error: 'No open vault.' };
@@ -125,9 +124,9 @@ function registerVaultIpcHandlers(mainWindow) {
         const db = getCurrentDB();
         if (!db) return [];
         try {
-            if (tabId === 'passwords') return await dbx.getPasswords(db);
-            if (tabId === 'files') return await dbx.getFiles(db);
-            if (tabId === 'gpg') return await dbx.getGpg(db);
+            if (tabId === 'passwords') return await getPasswords(db);
+            if (tabId === 'files') return await getFiles(db);
+            if (tabId === 'gpg') return await getGpg(db);
             return [];
         } catch (err) {
             console.error('get-data error:', err);
@@ -144,13 +143,13 @@ function registerVaultIpcHandlers(mainWindow) {
             if (payload.type === 'password') {
                 const { label, password } = payload;
                 if (!label || !password) return { success: false, error: 'Label and Password are required.' };
-                res = await dbx.addPassword(payload, db);
+                res = await addPassword(payload, db);
             } else if (payload.type === 'file') {
                 if (!payload.name || !payload.value) return { success: false, error: 'Missing required fields.' };
-                res = await dbx.addFile(payload, db);
+                res = await addFile(payload, db);
             } else if (payload.type === 'gpg') {
                 if (!payload.name || !payload.value) return { success: false, error: 'Missing required fields.' };
-                res = await dbx.addGpg(payload, db);
+                res = await addGpg(payload, db);
             } else {
                 return { success: false, error: 'Unsupported type.' };
             }
@@ -167,7 +166,7 @@ function registerVaultIpcHandlers(mainWindow) {
         if (!db) return { success: false, error: 'No open vault/database.' };
         if (!payload || typeof payload.id !== 'number') return { success: false, error: 'Missing id.' };
         try {
-            const res = await dbx.updatePassword(payload, db);
+            const res = await updatePassword(payload, db);
             if (!res || typeof res.changes !== 'number') {
                 return { success: false, error: 'No fields to update.' };
             }
@@ -184,7 +183,7 @@ function registerVaultIpcHandlers(mainWindow) {
         if (!db) return { success: false, error: 'No open vault/database.' };
         if (typeof id !== 'number') return { success: false, error: 'Invalid id.' };
         try {
-            const res = await dbx.deletePassword(id, db);
+            const res = await deletePassword(id, db);
             try { await flushAndSeal(); } catch (e) { console.error('Auto-save (seal) after delete-password failed:', e); }
             return { success: true, changes: res && res.changes };
         } catch (err) {
@@ -197,7 +196,7 @@ function registerVaultIpcHandlers(mainWindow) {
         const db = getCurrentDB();
         if (!db) return { passwords: 0, files: 0, gpg: 0 };
         try {
-            return await dbx.getCounts(db);
+            return await getCounts(db);
         } catch (err) {
             console.error('get-counts error:', err);
             return { passwords: 0, files: 0, gpg: 0 };
@@ -208,7 +207,7 @@ function registerVaultIpcHandlers(mainWindow) {
         const db = getCurrentDB();
         if (!db) return [];
         try {
-            return await dbx.getGroups(db);
+            return await getGroups(db);
         } catch (err) {
             console.error('get-groups error:', err);
             return [];
@@ -220,7 +219,7 @@ function registerVaultIpcHandlers(mainWindow) {
         if (!db) return { success: false, error: 'No open vault/database.' };
         if (!name) return { success: false, error: 'Name required.' };
         try {
-            const res = await dbx.addGroup(name, db);
+            const res = await addGroup(name, db);
             try { await flushAndSeal(); } catch (e) { console.error('seal after add-group', e); }
             return { success: true, id: res && res.id };
         } catch (err) {
@@ -233,7 +232,7 @@ function registerVaultIpcHandlers(mainWindow) {
         if (!db) return { success: false, error: 'No open vault/database.' };
         if (typeof id !== 'number') return { success: false, error: 'Invalid id.' };
         try {
-            const res = await dbx.deleteGroup(id, db);
+            const res = await deleteGroup(id, db);
             try { await flushAndSeal(); } catch (e) { console.error('seal after delete-group', e); }
             return { success: true, changes: res && res.changes };
         } catch (err) {
