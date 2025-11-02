@@ -22,7 +22,6 @@ class VaultHandler {
         if (!fs.existsSync(this.tempDir)) fs.mkdirSync(this.tempDir, { recursive: true });
     }
 
-    /** Seal current temp DB back into the vault file without closing DB or cleaning temp dir */
     async sealVault() {
         const dbPath = path.join(this.tempDir, 'metadata.db');
         if (!fs.existsSync(dbPath)) {
@@ -80,7 +79,6 @@ class VaultHandler {
             db.run(`PRAGMA key = '${safeKey}'`, (err) => {
                 if (err) return reject(err);
                 console.log('Key set');
-                // Use durable settings so we always package real data into the vault
                 db.get('PRAGMA journal_mode = DELETE', (jmErr) => {
                     if (jmErr) console.warn('PRAGMA journal_mode set error:', jmErr);
                     db.run('PRAGMA synchronous = FULL', (syncErr) => {
@@ -96,7 +94,6 @@ class VaultHandler {
                                 db.run('CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)', (err) => {
                                     if (err) return reject(err);
                                     console.log('Table passwords created');
-                                    // Ensure all changes flushed and DB closed before resolving
                                     db.run('PRAGMA wal_checkpoint(TRUNCATE)', (chkErr) => {
                                         if (chkErr) console.warn('Checkpoint error:', chkErr);
                                         console.log('Checkpoint done');
@@ -118,7 +115,6 @@ class VaultHandler {
         });
     }
 
-    /** -------------------- Opening existing vault -------------------- */
     async openVault() {
         try {
             const encryptedData = fs.readFileSync(this.vaultPath); // Buffer
@@ -140,7 +136,6 @@ class VaultHandler {
         }
     }
 
-    /** -------------------- Closing vault -------------------- */
     async closeVault() {
         await closeCurrentDB();
 
@@ -165,7 +160,6 @@ class VaultHandler {
         this.cleanTempDir();
     }
 
-    /** -------------------- GPG (binary mode) -------------------- */
     async encryptWithGPG(dataBuffer) {
         const message = await openpgp.createMessage({ binary: dataBuffer });
         const encrypted = await openpgp.encrypt({

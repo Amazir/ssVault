@@ -16,5 +16,11 @@ contextBridge.exposeInMainWorld('api', {
     addItem: (payload) => ipcRenderer.invoke('add-item', payload),
     updatePassword: (payload) => ipcRenderer.invoke('update-password', payload),
     deletePassword: (id) => ipcRenderer.invoke('delete-password', id),
-    manualSave: () => ipcRenderer.invoke('manual-save')
+    manualSave: () => ipcRenderer.invoke('manual-save'),
+    // New dashboard helpers
+    getCounts: () => ipcRenderer.invoke('get-counts'),
+    getVaultName: () => ipcRenderer.invoke('get-vault-name'),
+    getGroups: () => ipcRenderer.invoke('get-groups'),
+    addGroup: (name) => ipcRenderer.invoke('add-group', name),
+    deleteGroup: (id) => ipcRenderer.invoke('delete-group', id)
 });

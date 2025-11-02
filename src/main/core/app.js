@@ -7,6 +7,7 @@ function createWindow() {
         height: 720,
         show: false, // show after ready-to-show to avoid initial UI freeze
         backgroundColor: '#1e1e1e',
+        resizable: false,
         webPreferences: {
             preload: path.join(__dirname, '../preload.js'),
             nodeIntegration: false,

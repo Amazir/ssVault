@@ -9,10 +9,58 @@
         <link rel="stylesheet" href="../css/styles.css">
     </head>
     <body>
-    <div class="container mt-5">
-        <h1 class="mb-0">Management Panel</h1>
-        <ul class="nav nav-tabs mt-3" id="dashboardTabs">
-            <li class="nav-item"><a class="nav-link active" href="#passwords" data-bs-toggle="tab">Passwords</a></li>
+    <div class="container mt-4">
+        <div class="mb-4">
+            <h2 class="mb-1">Welcome in vault <span id="vaultName" class="text-primary"></span></h2>
+            <small class="text-muted">Quick overview</small>
+        </div>
+        <div class="row g-3" id="summaryRow">
+            <div class="col-12 col-sm-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
+                            <div>
+                                <div id="countPasswords" class="h3 mb-0">0</div>
+                                <small class="text-muted">Passwords</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
+                            <div>
+                                <div id="countFiles" class="h3 mb-0">0</div>
+                                <small class="text-muted">Files</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
+                            <div>
+                                <div id="countGpg" class="h3 mb-0">0</div>
+                                <small class="text-muted">GPG keys</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs mt-4" id="dashboardTabs">
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle active" href="#" id="passwordsDropdown" data-bs-toggle="dropdown" role="button" aria-expanded="false">Passwords</a>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item nav-link" href="#passwords" data-bs-toggle="tab">Passwords</a></li>
+                    <li><a class="dropdown-item nav-link" href="#groups" data-bs-toggle="tab">Groups</a></li>
+                </ul>
+            </li>
             <li class="nav-item"><a class="nav-link" href="#files" data-bs-toggle="tab">Files</a></li>
             <li class="nav-item"><a class="nav-link" href="#gpg" data-bs-toggle="tab">GPG Keys</a></li>
         </ul>
@@ -55,6 +103,20 @@
                         </td>
                     </tr>
                 </template>
+            </div>
+            <div class="tab-pane" id="groups">
+                <table class="table table-bordered">
+                    <thead>
+                    <tr>
+                        <th>Group name</th>
+                        <th style="width: 120px;">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="groups-body"></tbody>
+                </table>
+                <div class="d-flex justify-content-end mt-2">
+                    <button class="btn btn-primary" id="addGroupBtn">Add group</button>
+                </div>
             </div>
             <div class="tab-pane" id="files">
                 <table class="table table-bordered">
