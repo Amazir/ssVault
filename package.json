@@ -1,10 +1,11 @@
 {
   "name": "ssVault",
   "version": "1.0.0",
-  "description": "",
+  "description": "Secure local password and secrets manager built with Electron.",
+  "productName": "ssVault",
   "main": "src/main/main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"No automated tests configured\"",
     "start": "electron-forge start",
     "build": "electron-builder",
     "package": "electron-forge package",
