@@ -9,12 +9,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
+    # Budujemy na wszystkich trzech głównych platformach,
+    # żeby generować natywne instalatory dla Linux/Windows/macOS.
     strategy:
       matrix:
-        # Use LTS and one current compatible with Electron 38 toolchain
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node-version: [18.x, 20.x]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -37,7 +38,9 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ssVault-${{ matrix.node-version }}-${{ runner.os }}
+          # Nazwa artefaktu zawiera system i wersję Node, np.:
+          # ssVault-ubuntu-latest-18.x, ssVault-windows-latest-20.x, ssVault-macos-latest-18.x
+          name: ssVault-${{ matrix.os }}-${{ matrix.node-version }}
           path: |
             out/**
           if-no-files-found: error
