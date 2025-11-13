@@ -9,3 +9,8 @@ Aplikacja desktopowa do bezpiecznego przechowywania plików z szyfrowaniem i pro
 ## Uruchomienie
 1. Zainstaluj zależności: `npm install`
 2. Uruchom aplikację: `npm start`
+
+
+
+
+   [![Build](https://github.com/Amazir/ssVault/actions/workflows/node.js.yml/badge.svg)](https://github.com/Amazir/ssVault/actions/workflows/node.js.yml)
