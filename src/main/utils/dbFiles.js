@@ -35,29 +35,74 @@ async function ensureFileColumns(db = getCurrentDB()) {
 }
 
 /**
- * Get all files with enhanced metadata
+ * Determine high-level file type from name or stored filename.
+ * Categories kept intentionally szerokie do sortowania/filtrów w UI.
+ */
+function mapFileType(filename = '') {
+    const lower = filename.toLowerCase();
+
+    // Images
+    if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|heic|heif|ico)$/.test(lower)) return 'Image';
+
+    // Video
+    if (/\.(mp4|m4v|mkv|mov|avi|wmv|flv|webm|mpeg|mpg|3gp)$/.test(lower)) return 'Video';
+
+    // Audio
+    if (/\.(mp3|wav|flac|aac|ogg|m4a|wma|opus)$/.test(lower)) return 'Audio';
+
+    // Archives / packages
+    if (/\.(zip|rar|7z|tar|gz|bz2|xz|tgz|iso|dmg)$/.test(lower)) return 'Archive';
+
+    // Documents / text-like
+    if (/\.(txt|md|rtf|log)$/.test(lower)) return 'Text';
+    if (/\.(pdf)$/.test(lower)) return 'PDF';
+    if (/\.(docx?|odt|rtf)$/.test(lower)) return 'Document';
+    if (/\.(xlsx?|ods|csv|tsv)$/.test(lower)) return 'Spreadsheet';
+    if (/\.(pptx?|odp)$/.test(lower)) return 'Presentation';
+
+    // Code / config
+    if (/\.(js|ts|jsx|tsx|java|c|cpp|cs|go|rs|py|php|rb|swift|kt|sql|html|css|json|yml|yaml|xml|ini|cfg|env)$/.test(lower)) {
+        return 'Code/Config';
+    }
+
+    // Data / binaries
+    if (/\.(db|sqlite|sqlite3|bak|bin|dat)$/.test(lower)) return 'Data';
+
+    return 'Other';
+}
+
+/**
+ * Get all files with enhanced metadata + computed type (bez zmian w schemacie).
  */
 async function getFiles(db = getCurrentDB()) {
     await ensureBaseTables(db);
     await ensureFileColumns(db);
     
-    // Handle both old and new table structure
     const cols = await all(db, 'PRAGMA table_info(files)');
     const have = (n) => cols.some(c => c.name === n);
     
     if (have('original_name')) {
         // New structure
-        return all(db, `SELECT id,
-                               COALESCE(name, original_name) as name,
-                               original_name,
-                               size,
-                               hash,
-                               stored_filename,
-                               added_date
-                        FROM files ORDER BY id DESC`);
+        const rows = await all(db, `SELECT id,
+                                           COALESCE(name, original_name) as name,
+                                           original_name,
+                                           size,
+                                           hash,
+                                           stored_filename,
+                                           added_date
+                                    FROM files ORDER BY id DESC`);
+        // Dodaj pole type dynamicznie po stronie serwera
+        return rows.map(row => ({
+            ...row,
+            type: mapFileType(row.original_name || row.name || row.stored_filename)
+        }));
     } else {
         // Fallback for old structure (should not happen after migration)
-        return all(db, `SELECT id, name, path as stored_filename FROM files ORDER BY id DESC`);
+        const rows = await all(db, `SELECT id, name, path as stored_filename FROM files ORDER BY id DESC`);
+        return rows.map(row => ({
+            ...row,
+            type: mapFileType(row.name || row.stored_filename)
+        }));
     }
 }
 

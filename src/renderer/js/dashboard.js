@@ -1,3 +1,20 @@
+function mapFileTypeFromName(filename = '') {
+    const lower = filename.toLowerCase();
+
+    if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|heic|heif|ico)$/.test(lower)) return 'Image';
+    if (/\.(mp4|m4v|mkv|mov|avi|wmv|flv|webm|mpeg|mpg|3gp)$/.test(lower)) return 'Video';
+    if (/\.(mp3|wav|flac|aac|ogg|m4a|wma|opus)$/.test(lower)) return 'Audio';
+    if (/\.(zip|rar|7z|tar|gz|bz2|xz|tgz|iso|dmg)$/.test(lower)) return 'Archive';
+    if (/\.(txt|md|rtf|log)$/.test(lower)) return 'Text';
+    if (/\.(pdf)$/.test(lower)) return 'PDF';
+    if (/\.(docx?|odt|rtf)$/.test(lower)) return 'Document';
+    if (/\.(xlsx?|ods|csv|tsv)$/.test(lower)) return 'Spreadsheet';
+    if (/\.(pptx?|odp)$/.test(lower)) return 'Presentation';
+    if (/\.(js|ts|jsx|tsx|java|c|cpp|cs|go|rs|py|php|rb|swift|kt|sql|html|css|json|yml|yaml|xml|ini|cfg|env)$/.test(lower)) return 'Code/Config';
+    if (/\.(db|sqlite|sqlite3|bak|bin|dat)$/.test(lower)) return 'Data';
+    return 'Other';
+}
+
 // Custom tab handling supports dropdown items acting as tabs
 function setupTabs() {
     const tabLinks = document.querySelectorAll('#dashboardTabs .nav-link[href^="#"]');
@@ -27,14 +44,13 @@ function setupTabs() {
 document.addEventListener('DOMContentLoaded', () => {
     // Small helpers to keep code terse
     const qs = (sel, root = document) => root.querySelector(sel);
-    const qsa = (sel, root = document) => Array.from(root.querySelectorAll(sel));
     const byId = (id) => document.getElementById(id);
     const getTemplate = (id) => byId(id).content.firstElementChild;
 
-    // Setup our custom tabs (supports dropdown)
+    // Setup custom tabs
     setupTabs();
 
-    // Map tab ids to singular entity types and messages
+    // Map tab IDs to singular entity types and messages
     const typeMeta = {
         passwords: { singular: 'password', emptyTitle: 'No passwords yet', emptyDesc: 'Use the button below to add your first password.' },
         files: { singular: 'file', emptyTitle: 'No files yet', emptyDesc: 'Use the button below to add your first file.' },
@@ -72,12 +88,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('addTitle').textContent = `Add new ${entityType}`;
         document.getElementById('addType').value = entityType;
         document.getElementById('editId').value = '';
-        // reset common inputs
         document.getElementById('addName').value = '';
         const extra = document.getElementById('addExtra');
         extra.innerHTML = '';
+
         if (entityType === 'password') {
-            // Adjust main label to "Label" for passwords
             document.querySelector("label[for='addName']").textContent = 'Label';
             extra.innerHTML = `
                 <div class="mb-3">
@@ -169,12 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Submit modal
     document.getElementById('addSubmit').addEventListener('click', async () => {
         const entityType = document.getElementById('addType').value; // password | file | gpg
         const editId = document.getElementById('editId').value;
         const name = document.getElementById('addName').value;
-        // Build payload depending on type
+
         let payload;
         let response;
         if (entityType === 'password') {
@@ -192,7 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 response = await window.api.addItem(payload);
             }
         } else if (entityType === 'file') {
-            // Handle file addition through new API
             response = await window.api.addFileToVault();
         } else {
             const value = document.getElementById('addValue').value;
@@ -202,7 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (response && response.success) {
             bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
-            // After adding/updating, reload current tab based on entityType -> tab id
             const tabId = Object.keys(typeMeta).find(k => typeMeta[k].singular === entityType) || 'passwords';
             await loadData(tabId);
             await loadCounts();
@@ -211,9 +223,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Generic sort helper for simple arrays of objects
+    function sortByKey(data, key, dir = 'asc') {
+        const factor = dir === 'asc' ? 1 : -1;
+        return [...data].sort((a, b) => {
+            let va = a[key];
+            let vb = b[key];
+
+            if (typeof va === 'number' && typeof vb === 'number') {
+                return (va - vb) * factor;
+            }
+
+            va = (va ?? '').toString().toLowerCase();
+            vb = (vb ?? '').toString().toLowerCase();
+            if (va < vb) return -1 * factor;
+            if (va > vb) return 1 * factor;
+            return 0;
+        });
+    }
+
+    const sortState = {
+        passwords: { key: 'label', dir: 'asc' },
+        files: { key: 'name', dir: 'asc' },
+        gpg: { key: 'name', dir: 'asc' },
+        groups: { key: 'name', dir: 'asc' }
+    };
+
     function renderEmptyState(tabId, body) {
         const meta = typeMeta[tabId];
-        const colspan = tabId === 'passwords' ? 6 : 2;
+        const colspan =
+            tabId === 'passwords'
+                ? 6
+                : tabId === 'files'
+                    ? 5
+                    : tabId === 'gpg'
+                        ? 2
+                        : 2;
         body.innerHTML = `
             <tr>
                 <td colspan="${colspan}" class="text-center">
@@ -225,12 +270,11 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>`;
     }
 
-    async function loadData(tabId) {
+    async function loadData(tabId, keepSort = true) {
         const body = document.getElementById(`${tabId}-body`);
         if (tabId === 'groups') {
             const groups = await window.api.getGroups();
             if (!groups || groups.length === 0) {
-                // Custom empty state for groups
                 body.innerHTML = `
                     <tr>
                         <td colspan="2" class="text-center">
@@ -260,57 +304,124 @@ document.addEventListener('DOMContentLoaded', () => {
             data = await window.api.getData(tabId);
         } else if (tabId === 'files') {
             data = await window.api.getFilesData();
+        } else if (tabId === 'gpg') {
+            data = await window.api.getData('gpg');
         } else {
             data = await window.api.getData(tabId);
         }
-        
+
         if (!data || data.length === 0) {
             renderEmptyState(tabId, body);
-        } else {
-            body.innerHTML = '';
-            if (tabId === 'passwords') {
-                passwordItems.clear();
-                const rowTpl = getTemplate('password-row-template');
-                data.forEach(item => {
-                    passwordItems.set(item.id, item);
-                    const tr = rowTpl.cloneNode(true);
-                    qs('.cell-label', tr).textContent = item.label || '';
-                    qs('.cell-group', tr).textContent = item.group_name || '';
-                    qs('.cell-address', tr).textContent = item.address || '';
-                    qs('.cell-username', tr).textContent = item.username || '';
-                    qs('.cell-password', tr).textContent = item.password || '';
-                    qs('.edit-password', tr).dataset.id = item.id;
-                    qs('.delete-password', tr).dataset.id = item.id;
-                    body.appendChild(tr);
-                });
-            } else if (tabId === 'files') {
-                data.forEach(item => {
-                    const tr = document.createElement('tr');
-                    const sizeKB = item.size ? Math.round(item.size / 1024) : 0;
-                    const addedDate = item.added_date ? new Date(item.added_date).toLocaleDateString() : '';
-                    tr.innerHTML = `
-                        <td>${item.name || item.original_name || ''}</td>
-                        <td>${sizeKB} KB</td>
-                        <td>${addedDate}</td>
-                        <td>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-sm btn-outline-primary export-file" data-id="${item.id}" title="Export file">
-                                    <i class="bi bi-download"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger delete-file" data-id="${item.id}" title="Delete file">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </div>
-                        </td>`;
-                    body.appendChild(tr);
-                });
-            } else {
-                data.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>${item.name}</td><td>${item.value}</td>`;
-                    body.appendChild(tr);
-                });
+            return;
+        }
+
+        // Przygotuj dane + sort
+        let rows = [...data];
+
+        if (tabId === 'files') {
+            rows = rows.map(f => {
+                const displayName = f.name || f.original_name || f.stored_filename || '';
+                const type = f.type || mapFileTypeFromName(displayName);
+                const size = f.size || 0;
+                const added = f.added_date || '';
+                return {
+                    ...f,
+                    _displayName: displayName,
+                    _type: type,
+                    _size: size,
+                    _added: added
+                };
+            });
+
+            const state = sortState.files;
+            if (keepSort && state.key) {
+                const keyMap = {
+                    name: '_displayName',
+                    type: '_type',
+                    size: '_size',
+                    added: '_added',
+                    added_date: '_added'
+                };
+                const sortKey = keyMap[state.key] || '_displayName';
+                rows = sortByKey(rows, sortKey, state.dir);
             }
+        } else if (tabId === 'passwords') {
+            const state = sortState.passwords;
+            if (keepSort && state.key) {
+                rows = sortByKey(rows, state.key, state.dir);
+            }
+        } else if (tabId === 'gpg') {
+            const state = sortState.gpg;
+            if (keepSort && state.key) {
+                rows = sortByKey(rows, state.key, state.dir);
+            }
+        } else if (tabId === 'groups') {
+            const state = sortState.groups;
+            if (keepSort && state.key) {
+                rows = sortByKey(rows, state.key, state.dir);
+            }
+        }
+
+        // Render
+        body.innerHTML = '';
+
+        if (tabId === 'passwords') {
+            passwordItems.clear();
+            const rowTpl = getTemplate('password-row-template');
+            rows.forEach(item => {
+                passwordItems.set(item.id, item);
+                const tr = rowTpl.cloneNode(true);
+                qs('.cell-label', tr).textContent = item.label || '';
+                qs('.cell-group', tr).textContent = item.group_name || '';
+                qs('.cell-address', tr).textContent = item.address || '';
+                qs('.cell-username', tr).textContent = item.username || '';
+                qs('.cell-password', tr).textContent = item.password || '';
+                qs('.edit-password', tr).dataset.id = item.id;
+                qs('.delete-password', tr).dataset.id = item.id;
+                body.appendChild(tr);
+            });
+        } else if (tabId === 'files') {
+            rows.forEach(item => {
+                const displayName = item._displayName;
+                const type = item._type;
+                const sizeKB = item._size ? Math.round(item._size / 1024) : 0;
+                const addedDate = item._added ? new Date(item._added).toLocaleDateString() : '';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${displayName}</td>
+                    <td>${type}</td>
+                    <td>${sizeKB} KB</td>
+                    <td>${addedDate}</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary export-file" data-id="${item.id}" title="Export file">
+                                <i class="bi bi-download"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger delete-file" data-id="${item.id}" title="Delete file">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>`;
+                body.appendChild(tr);
+            });
+        } else if (tabId === 'gpg') {
+            rows.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${item.name}</td><td>${item.value}</td>`;
+                body.appendChild(tr);
+            });
+        } else if (tabId === 'groups') {
+            rows.forEach(g => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${g.name}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger delete-group" data-id="${g.id}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>`;
+                body.appendChild(tr);
+            });
         }
     }
 
@@ -371,11 +482,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Click-to-sort for all tables
+    document.querySelectorAll('th[data-sort-key]').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', () => {
+            const key = th.getAttribute('data-sort-key');
+            // Ustal aktywną zakładkę
+            const activePane = document.querySelector('.tab-pane.active');
+            if (!activePane) return;
+            const tabId = activePane.id;
+
+            const state = sortState[tabId];
+            if (!state) return;
+
+            // Toggle kierunku, gdy klikamy ten sam klucz
+            const nextDir =
+                state.key === key
+                    ? (state.dir === 'asc' ? 'desc' : 'asc')
+                    : 'asc';
+
+            sortState[tabId] = { key, dir: nextDir };
+            loadData(tabId, true);
+        });
+    });
+
     // Initial load
     loadVaultName();
     loadCounts();
-    // Load default passwords tab
     loadData('passwords');
-    // Also pre-load files so counter and list are correct on first view
     loadData('files');
 });

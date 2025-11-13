@@ -25,7 +25,7 @@ function createWindow() {
 
 /*
 
-TODO: ogarnac grupy do haseł, ogarnac sortowanie, dodac typ pliku, ogarnac wielkosc GUI pierwszego okna, ogarnac kod czytelnosc
+TODO: ogarnac grupy do haseł, ogarnac sortowanie, ogarnac wielkosc GUI pierwszego okna, ogarnac kod czytelnosc
  */
 
 module.exports = { createWindow };
