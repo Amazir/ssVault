@@ -29,6 +29,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Ensure the Electron app packages successfully using Electron Forge
-      - name: Verify make (packaging)
+      # Build distributables with Electron Forge
+      - name: Make distributables
         run: npm run make
+
+      # Upload all generated artifacts from the out/ directory
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssVault-${{ matrix.node-version }}-${{ runner.os }}
+          path: |
+            out/**
+          if-no-files-found: error
