@@ -55,8 +55,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadCounts() {
         try {
             const c = await window.api.getCounts();
+            const filesCount = await window.api.getFilesCount().catch(() => 0);
+            
             byId('countPasswords').textContent = c.passwords ?? 0;
-            byId('countFiles').textContent = c.files ?? 0;
+            byId('countFiles').textContent = filesCount;
             byId('countGpg').textContent = c.gpg ?? 0;
         } catch (_) {
             byId('countPasswords').textContent = '0';
@@ -95,8 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <input type="password" class="form-control" id="addValue" required>
                 </div>`;
         } else if (entityType === 'file') {
-            document.querySelector("label[for='addName']").textContent = 'Name';
-            extra.innerHTML = '<label for="addValue" class="form-label">File path</label><input type="file" class="form-control" id="addValue" required>';
+            document.querySelector("label[for='addName']").textContent = 'File name (optional)';
+            extra.innerHTML = `
+                <div class="alert alert-info">
+                    <small><strong>Note:</strong> Click "Add" to select a file. You'll be asked whether to copy or move the file to the vault.</small>
+                </div>`;
         } else if (entityType === 'gpg') {
             document.querySelector("label[for='addName']").textContent = 'Name';
             extra.innerHTML = '<label for="addValue" class="form-label">Key</label><input type="text" class="form-control" id="addValue" required>';
@@ -186,6 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 payload = { type: 'password', label, group, address, username, password: pwd };
                 response = await window.api.addItem(payload);
             }
+        } else if (entityType === 'file') {
+            // Handle file addition through new API
+            response = await window.api.addFileToVault();
         } else {
             const value = document.getElementById('addValue').value;
             if (!name || !value) { alert('Please fill all required fields.'); return; }
@@ -247,7 +255,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const data = await window.api.getData(tabId); // expects: passwords | files | gpg
+        let data;
+        if (tabId === 'passwords') {
+            data = await window.api.getData(tabId);
+        } else if (tabId === 'files') {
+            data = await window.api.getFilesData();
+        } else {
+            data = await window.api.getData(tabId);
+        }
+        
         if (!data || data.length === 0) {
             renderEmptyState(tabId, body);
         } else {
@@ -265,6 +281,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     qs('.cell-password', tr).textContent = item.password || '';
                     qs('.edit-password', tr).dataset.id = item.id;
                     qs('.delete-password', tr).dataset.id = item.id;
+                    body.appendChild(tr);
+                });
+            } else if (tabId === 'files') {
+                data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const sizeKB = item.size ? Math.round(item.size / 1024) : 0;
+                    const addedDate = item.added_date ? new Date(item.added_date).toLocaleDateString() : '';
+                    tr.innerHTML = `
+                        <td>${item.name || item.original_name || ''}</td>
+                        <td>${sizeKB} KB</td>
+                        <td>${addedDate}</td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-primary export-file" data-id="${item.id}" title="Export file">
+                                    <i class="bi bi-download"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger delete-file" data-id="${item.id}" title="Delete file">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>`;
                     body.appendChild(tr);
                 });
             } else {
@@ -303,8 +340,42 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // File operations event handlers
+    document.getElementById('files-body').addEventListener('click', async (e) => {
+        const exportBtn = e.target.closest('.export-file');
+        const deleteBtn = e.target.closest('.delete-file');
+        
+        if (exportBtn) {
+            const id = Number(exportBtn.dataset.id);
+            if (Number.isFinite(id)) {
+                const res = await window.api.exportFileFromVault(id);
+                if (res && res.success) {
+                    alert(`File exported to: ${res.exportPath}`);
+                } else {
+                    alert((res && res.error) || 'Export failed');
+                }
+            }
+        } else if (deleteBtn) {
+            const id = Number(deleteBtn.dataset.id);
+            if (Number.isFinite(id)) {
+                if (confirm('Delete this file from vault? This action cannot be undone.')) {
+                    const res = await window.api.deleteFileFromVault(id);
+                    if (res && res.success) {
+                        await loadData('files');
+                        await loadCounts();
+                    } else {
+                        alert((res && res.error) || 'Delete failed');
+                    }
+                }
+            }
+        }
+    });
+
     // Initial load
     loadVaultName();
     loadCounts();
+    // Load default passwords tab
     loadData('passwords');
+    // Also pre-load files so counter and list are correct on first view
+    loadData('files');
 });

@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const path = require('path');
 const sqlite3 = require('@journeyapps/sqlcipher').verbose();
 const { openVaultDB, closeCurrentDB } = require('../utils/db');
+const FileManager = require('../utils/fileManager');
 
 const saltRounds = 10;
 
@@ -20,6 +21,7 @@ class VaultHandler {
         this.tempDir = path.join(os.tmpdir(), 'ssVault-temp');
         this.cleanTempDir();
         if (!fs.existsSync(this.tempDir)) fs.mkdirSync(this.tempDir, { recursive: true });
+        this.fileManager = new FileManager(this.tempDir);
     }
 
     async sealVault() {
@@ -29,6 +31,17 @@ class VaultHandler {
         }
         const zip = new AdmZip();
         zip.addLocalFile(dbPath);
+        
+        // Add all files from the files directory
+        const filesDir = path.join(this.tempDir, 'files');
+        if (fs.existsSync(filesDir)) {
+            const files = this.fileManager.getAllVaultFiles();
+            files.forEach(filename => {
+                const filePath = path.join(filesDir, filename);
+                zip.addLocalFile(filePath, 'files/');
+            });
+        }
+        
         const zipBuffer = zip.toBuffer();
         const encryptedZip = await this.encryptWithGPG(zipBuffer);
         fs.writeFileSync(this.vaultPath, encryptedZip);
@@ -55,8 +68,19 @@ class VaultHandler {
             const dbPath = await this.createEmptyDB();
             if (!fs.existsSync(dbPath)) throw new Error('DB not created');
             console.log('DB exists:', dbPath);
+            
+            // Create files directory in temp
+            this.fileManager.ensureFilesDirectory();
+            
             const zip = new AdmZip();
             zip.addLocalFile(dbPath);
+            
+            // Add empty files directory structure
+            const filesDir = path.join(this.tempDir, 'files');
+            if (fs.existsSync(filesDir)) {
+                zip.addLocalFolder(filesDir, 'files');
+            }
+            
             const zipBuffer = zip.toBuffer();
             const encryptedZip = await this.encryptWithGPG(zipBuffer);
             fs.writeFileSync(this.vaultPath, encryptedZip);
@@ -94,16 +118,34 @@ class VaultHandler {
                                 db.run('CREATE TABLE IF NOT EXISTS passwords (id INTEGER PRIMARY KEY, name TEXT, password TEXT)', (err) => {
                                     if (err) return reject(err);
                                     console.log('Table passwords created');
-                                    db.run('PRAGMA wal_checkpoint(TRUNCATE)', (chkErr) => {
-                                        if (chkErr) console.warn('Checkpoint error:', chkErr);
-                                        console.log('Checkpoint done');
-                                        db.close((closeErr) => {
-                                            if (closeErr) {
-                                                console.error('DB close error:', closeErr);
-                                                return reject(closeErr);
-                                            }
-                                            console.log('DB closed:', dbPath);
-                                            resolve(dbPath);
+                                    
+                                    // Create files table with enhanced structure
+                                    db.run('CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, name TEXT, original_name TEXT, size INTEGER, hash TEXT, stored_filename TEXT, added_date TEXT)', (filesErr) => {
+                                        if (filesErr) return reject(filesErr);
+                                        console.log('Table files created');
+                                        
+                                        // Create other tables
+                                        db.run('CREATE TABLE IF NOT EXISTS gpg (id INTEGER PRIMARY KEY, name TEXT, type TEXT)', (gpgErr) => {
+                                            if (gpgErr) return reject(gpgErr);
+                                            console.log('Table gpg created');
+                                            
+                                            db.run('CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT UNIQUE)', (groupsErr) => {
+                                                if (groupsErr) return reject(groupsErr);
+                                                console.log('Table groups created');
+                                                
+                                                db.run('PRAGMA wal_checkpoint(TRUNCATE)', (chkErr) => {
+                                                    if (chkErr) console.warn('Checkpoint error:', chkErr);
+                                                    console.log('Checkpoint done');
+                                                    db.close((closeErr) => {
+                                                        if (closeErr) {
+                                                            console.error('DB close error:', closeErr);
+                                                            return reject(closeErr);
+                                                        }
+                                                        console.log('DB closed:', dbPath);
+                                                        resolve(dbPath);
+                                                    });
+                                                });
+                                            });
                                         });
                                     });
                                 });
@@ -139,7 +181,6 @@ class VaultHandler {
     async closeVault() {
         await closeCurrentDB();
 
-        // Only include the SQLite file to avoid temp artifacts
         const dbPath = path.join(this.tempDir, 'metadata.db');
         if (!fs.existsSync(dbPath)) {
             throw new Error('metadata.db not found during closeVault');
@@ -149,10 +190,20 @@ class VaultHandler {
 
         const zip = new AdmZip();
         zip.addLocalFile(dbPath);
+        
+        // Add all files from the files directory
+        const filesDir = path.join(this.tempDir, 'files');
+        if (fs.existsSync(filesDir)) {
+            const files = this.fileManager.getAllVaultFiles();
+            files.forEach(filename => {
+                const filePath = path.join(filesDir, filename);
+                zip.addLocalFile(filePath, 'files/');
+            });
+        }
+        
         const zipBuffer = zip.toBuffer();
-
         const encryptedZip = await this.encryptWithGPG(zipBuffer);
-        fs.writeFileSync(this.vaultPath, encryptedZip); // write binary
+        fs.writeFileSync(this.vaultPath, encryptedZip);
 
         const afterSize = fs.statSync(this.vaultPath).size;
         console.log(`Vault sealed. Size: ${beforeSize} -> ${afterSize} bytes`);

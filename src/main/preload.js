@@ -22,5 +22,11 @@ contextBridge.exposeInMainWorld('api', {
     getVaultName: () => ipcRenderer.invoke('get-vault-name'),
     getGroups: () => ipcRenderer.invoke('get-groups'),
     addGroup: (name) => ipcRenderer.invoke('add-group', name),
-    deleteGroup: (id) => ipcRenderer.invoke('delete-group', id)
+    deleteGroup: (id) => ipcRenderer.invoke('delete-group', id),
+    // File operations
+    addFileToVault: () => ipcRenderer.invoke('add-file-to-vault'),
+    exportFileFromVault: (fileId) => ipcRenderer.invoke('export-file-from-vault', fileId),
+    deleteFileFromVault: (fileId) => ipcRenderer.invoke('delete-file-from-vault', fileId),
+    getFilesData: () => ipcRenderer.invoke('get-files-data'),
+    getFilesCount: () => ipcRenderer.invoke('get-files-count')
 });

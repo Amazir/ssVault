@@ -2,6 +2,7 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { createWindow } = require('./core/app');
 const { registerVaultIpcHandlers } = require('./ipc/vaultIpc');
+const { registerFileIpcHandlers } = require('./ipc/fileIpc');
 
 const VaultManager = require('./utils/vaultManager');
 global.vaultMgr = new VaultManager();
@@ -34,6 +35,7 @@ app.whenReady().then(() => {
     mainWindow.webContents.once('did-finish-load', showMain);
 
     registerVaultIpcHandlers(mainWindow);
+    registerFileIpcHandlers();
 });
 
 app.on('before-quit', async (event) => {
