@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 /*
-	Preload is using contextBridge to pass data from Electron backend core to frontend GUI.
+    Preload is using contextBridge to pass data from Electron backend core to frontend GUI.
 */
 
 contextBridge.exposeInMainWorld('api', {

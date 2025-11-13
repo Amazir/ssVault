@@ -5,7 +5,7 @@ async function loadVaults() {
         return;
     }
 
-	// Get vaults from server
+    // Get vaults from server
     const vaults = await window.api.getVaults();
     
     // Get vault list object from html and clear it
