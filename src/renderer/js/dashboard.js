@@ -15,40 +15,11 @@ function mapFileTypeFromName(filename = '') {
     return 'Other';
 }
 
-// Custom tab handling supports dropdown items acting as tabs
-function setupTabs() {
-    const tabLinks = document.querySelectorAll('#dashboardTabs .nav-link[href^="#"]');
-    tabLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const target = link.getAttribute('href');
-            // Activate visual state in tabs (leave dropdown toggle as active always)
-            document.querySelectorAll('#dashboardTabs .nav-link').forEach(l => l.classList.remove('active'));
-            // Keep the dropdown toggle marked active
-            const ddToggle = document.getElementById('passwordsDropdown');
-            if (ddToggle) ddToggle.classList.add('active');
-            link.classList.add('active');
-            // Show tab content
-            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-            const pane = document.querySelector(target);
-            if (pane) pane.classList.add('active');
-            // Load data for shown tab
-            const tabId = target.slice(1);
-            if (['passwords','files','gpg','groups'].includes(tabId)) {
-                loadData(tabId);
-            }
-        });
-    });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     // Small helpers to keep code terse
     const qs = (sel, root = document) => root.querySelector(sel);
     const byId = (id) => document.getElementById(id);
     const getTemplate = (id) => byId(id).content.firstElementChild;
-
-    // Setup custom tabs
-    setupTabs();
 
     // Map tab IDs to singular entity types and messages
     const typeMeta = {
@@ -59,169 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const passwordItems = new Map();
-
-    async function loadVaultName() {
-        try {
-            const name = await window.api.getVaultName();
-            const el = byId('vaultName');
-            if (el) el.textContent = name || '';
-        } catch (_) {}
-    }
-
-    async function loadCounts() {
-        try {
-            const c = await window.api.getCounts();
-            const filesCount = await window.api.getFilesCount().catch(() => 0);
-            
-            byId('countPasswords').textContent = c.passwords ?? 0;
-            byId('countFiles').textContent = filesCount;
-            byId('countGpg').textContent = c.gpg ?? 0;
-        } catch (_) {
-            byId('countPasswords').textContent = '0';
-            byId('countFiles').textContent = '0';
-            byId('countGpg').textContent = '0';
-        }
-    }
-
-    function openAddModal(entityType) {
-        const modal = new bootstrap.Modal(document.getElementById('addModal'));
-        document.getElementById('addTitle').textContent = `Add new ${entityType}`;
-        document.getElementById('addType').value = entityType;
-        document.getElementById('editId').value = '';
-        document.getElementById('addName').value = '';
-        const extra = document.getElementById('addExtra');
-        extra.innerHTML = '';
-
-        if (entityType === 'password') {
-            document.querySelector("label[for='addName']").textContent = 'Label';
-            extra.innerHTML = `
-                <div class="mb-3">
-                    <label for="addGroup" class="form-label">Group</label>
-                    <input type="text" class="form-control" id="addGroup" placeholder="e.g. Banking">
-                </div>
-                <div class="mb-3">
-                    <label for="addAddress" class="form-label">Address</label>
-                    <input type="text" class="form-control" id="addAddress" placeholder="https://... or App name">
-                </div>
-                <div class="mb-3">
-                    <label for="addUsername" class="form-label">Username/E-Mail</label>
-                    <input type="text" class="form-control" id="addUsername">
-                </div>
-                <div class="mb-3">
-                    <label for="addValue" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="addValue" required>
-                </div>`;
-        } else if (entityType === 'file') {
-            document.querySelector("label[for='addName']").textContent = 'File name (optional)';
-            extra.innerHTML = `
-                <div class="alert alert-info">
-                    <small><strong>Note:</strong> Click "Add" to select a file. You'll be asked whether to copy or move the file to the vault.</small>
-                </div>`;
-        } else if (entityType === 'gpg') {
-            document.querySelector("label[for='addName']").textContent = 'Name';
-            extra.innerHTML = '<label for="addValue" class="form-label">Key</label><input type="text" class="form-control" id="addValue" required>';
-        }
-        modal.show();
-    }
-
-    function openEditPasswordModal(item) {
-        const modal = new bootstrap.Modal(document.getElementById('addModal'));
-        document.getElementById('addTitle').textContent = 'Edit password';
-        document.getElementById('addType').value = 'password';
-        document.getElementById('editId').value = item.id;
-        document.querySelector("label[for='addName']").textContent = 'Label';
-        document.getElementById('addName').value = item.label || '';
-        const extra = document.getElementById('addExtra');
-        extra.innerHTML = `
-            <div class="mb-3">
-                <label for="addGroup" class="form-label">Group</label>
-                <input type="text" class="form-control" id="addGroup" placeholder="e.g. Banking" value="${item.group_name || ''}">
-            </div>
-            <div class="mb-3">
-                <label for="addAddress" class="form-label">Address</label>
-                <input type="text" class="form-control" id="addAddress" placeholder="https://... or App name" value="${item.address || ''}">
-            </div>
-            <div class="mb-3">
-                <label for="addUsername" class="form-label">Username/E-Mail</label>
-                <input type="text" class="form-control" id="addUsername" value="${item.username || ''}">
-            </div>
-            <div class="mb-3">
-                <label for="addValue" class="form-label">Password</label>
-                <input type="password" class="form-control" id="addValue" value="${item.password || ''}" required>
-            </div>`;
-        modal.show();
-    }
-
-    // Plus buttons in headers
-    document.querySelectorAll('.add-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const entityType = e.currentTarget.dataset.type; // password | file | gpg
-            openAddModal(entityType);
-        });
-    });
-
-    // Actions in passwords table (edit/delete)
-    document.getElementById('passwords-body').addEventListener('click', async (e) => {
-        const editBtn = e.target.closest('.edit-password');
-        const delBtn = e.target.closest('.delete-password');
-        if (editBtn) {
-            const id = Number(editBtn.dataset.id);
-            const item = passwordItems.get(id);
-            if (item) openEditPasswordModal(item);
-        } else if (delBtn) {
-            const id = Number(delBtn.dataset.id);
-            if (Number.isFinite(id)) {
-                if (confirm('Delete this password?')) {
-                    const res = await window.api.deletePassword(id);
-                    if (res && res.success) {
-                        await loadData('passwords');
-                        await loadCounts();
-                    } else {
-                        alert((res && res.error) || 'Delete failed');
-                    }
-                }
-            }
-        }
-    });
-
-    document.getElementById('addSubmit').addEventListener('click', async () => {
-        const entityType = document.getElementById('addType').value; // password | file | gpg
-        const editId = document.getElementById('editId').value;
-        const name = document.getElementById('addName').value;
-
-        let payload;
-        let response;
-        if (entityType === 'password') {
-            const label = name; // treat main input as Label
-            const group = document.getElementById('addGroup').value || null;
-            const address = document.getElementById('addAddress').value || null;
-            const username = document.getElementById('addUsername').value || null;
-            const pwd = document.getElementById('addValue').value;
-            if (!label || !pwd) { alert('Label and Password are required.'); return; }
-            if (editId) {
-                payload = { id: Number(editId), label, group, address, username, password: pwd };
-                response = await window.api.updatePassword(payload);
-            } else {
-                payload = { type: 'password', label, group, address, username, password: pwd };
-                response = await window.api.addItem(payload);
-            }
-        } else if (entityType === 'file') {
-            response = await window.api.addFileToVault();
-        } else {
-            const value = document.getElementById('addValue').value;
-            if (!name || !value) { alert('Please fill all required fields.'); return; }
-            payload = { type: entityType, name, value };
-            response = await window.api.addItem(payload);
-        }
-        if (response && response.success) {
-            bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
-            const tabId = Object.keys(typeMeta).find(k => typeMeta[k].singular === entityType) || 'passwords';
-            await loadData(tabId);
-            await loadCounts();
-        } else {
-            alert((response && response.error) || 'Operation failed');
-        }
-    });
 
     // Generic sort helper for simple arrays of objects
     function sortByKey(data, key, dir = 'asc') {
@@ -425,6 +233,202 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function loadVaultName() {
+        try {
+            const name = await window.api.getVaultName();
+            const el = byId('vaultName');
+            if (el) el.textContent = name || '';
+        } catch (_) {}
+    }
+
+    async function loadCounts() {
+        try {
+            const c = await window.api.getCounts();
+            const filesCount = await window.api.getFilesCount().catch(() => 0);
+
+            byId('countPasswords').textContent = c.passwords ?? 0;
+            byId('countFiles').textContent = filesCount;
+            byId('countGpg').textContent = c.gpg ?? 0;
+        } catch (_) {
+            byId('countPasswords').textContent = '0';
+            byId('countFiles').textContent = '0';
+            byId('countGpg').textContent = '0';
+        }
+    }
+
+    function openAddModal(entityType) {
+        const modal = new bootstrap.Modal(document.getElementById('addModal'));
+        document.getElementById('addTitle').textContent = `Add new ${entityType}`;
+        document.getElementById('addType').value = entityType;
+        document.getElementById('editId').value = '';
+        document.getElementById('addName').value = '';
+        const extra = document.getElementById('addExtra');
+        extra.innerHTML = '';
+
+        if (entityType === 'password') {
+            document.querySelector("label[for='addName']").textContent = 'Label';
+            extra.innerHTML = `
+                <div class="mb-3">
+                    <label for="addGroup" class="form-label">Group</label>
+                    <input type="text" class="form-control" id="addGroup" placeholder="e.g. Banking">
+                </div>
+                <div class="mb-3">
+                    <label for="addAddress" class="form-label">Address</label>
+                    <input type="text" class="form-control" id="addAddress" placeholder="https://... or App name">
+                </div>
+                <div class="mb-3">
+                    <label for="addUsername" class="form-label">Username/E-Mail</label>
+                    <input type="text" class="form-control" id="addUsername">
+                </div>
+                <div class="mb-3">
+                    <label for="addValue" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="addValue" required>
+                </div>`;
+        } else if (entityType === 'file') {
+            document.querySelector("label[for='addName']").textContent = 'File name (optional)';
+            extra.innerHTML = `
+                <div class="alert alert-info">
+                    <small><strong>Note:</strong> Click "Add" to select a file. You'll be asked whether to copy or move the file to the vault.</small>
+                </div>`;
+        } else if (entityType === 'gpg') {
+            document.querySelector("label[for='addName']").textContent = 'Name';
+            extra.innerHTML = '<label for="addValue" class="form-label">Key</label><input type="text" class="form-control" id="addValue" required>';
+        }
+        modal.show();
+    }
+
+    function openEditPasswordModal(item) {
+        const modal = new bootstrap.Modal(document.getElementById('addModal'));
+        document.getElementById('addTitle').textContent = 'Edit password';
+        document.getElementById('addType').value = 'password';
+        document.getElementById('editId').value = item.id;
+        document.querySelector("label[for='addName']").textContent = 'Label';
+        document.getElementById('addName').value = item.label || '';
+        const extra = document.getElementById('addExtra');
+        extra.innerHTML = `
+            <div class="mb-3">
+                <label for="addGroup" class="form-label">Group</label>
+                <input type="text" class="form-control" id="addGroup" placeholder="e.g. Banking" value="${item.group_name || ''}">
+            </div>
+            <div class="mb-3">
+                <label for="addAddress" class="form-label">Address</label>
+                <input type="text" class="form-control" id="addAddress" placeholder="https://... or App name" value="${item.address || ''}">
+            </div>
+            <div class="mb-3">
+                <label for="addUsername" class="form-label">Username/E-Mail</label>
+                <input type="text" class="form-control" id="addUsername" value="${item.username || ''}">
+            </div>
+            <div class="mb-3">
+                <label for="addValue" class="form-label">Password</label>
+                <input type="password" class="form-control" id="addValue" value="${item.password || ''}" required>
+            </div>`;
+        modal.show();
+    }
+
+    // Custom tab handling supports dropdown items acting as tabs
+    function setupTabs() {
+        const tabLinks = document.querySelectorAll('#dashboardTabs .nav-link[href^="#"]');
+        tabLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = link.getAttribute('href');
+
+                // Skip if target is just '#' (invalid selector)
+                if (!target || target === '#') return;
+
+                // Activate visual state in tabs (leave dropdown toggle as active always)
+                document.querySelectorAll('#dashboardTabs .nav-link').forEach(l => l.classList.remove('active'));
+                // Keep the dropdown toggle marked active
+                const ddToggle = document.getElementById('passwordsDropdown');
+                if (ddToggle) ddToggle.classList.add('active');
+                link.classList.add('active');
+                // Show tab content
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                const pane = document.querySelector(target);
+                if (pane) pane.classList.add('active');
+                // Load data for shown tab
+                const tabId = target.slice(1);
+                if (['passwords','files','gpg','groups'].includes(tabId)) {
+                    loadData(tabId);
+                }
+            });
+        });
+    }
+
+    // Setup custom tabs
+    setupTabs();
+
+    // Plus buttons in headers
+    document.querySelectorAll('.add-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const entityType = e.currentTarget.dataset.type; // password | file | gpg
+            openAddModal(entityType);
+        });
+    });
+
+    // Actions in passwords table (edit/delete)
+    document.getElementById('passwords-body').addEventListener('click', async (e) => {
+        const editBtn = e.target.closest('.edit-password');
+        const delBtn = e.target.closest('.delete-password');
+        if (editBtn) {
+            const id = Number(editBtn.dataset.id);
+            const item = passwordItems.get(id);
+            if (item) openEditPasswordModal(item);
+        } else if (delBtn) {
+            const id = Number(delBtn.dataset.id);
+            if (Number.isFinite(id)) {
+                if (confirm('Delete this password?')) {
+                    const res = await window.api.deletePassword(id);
+                    if (res && res.success) {
+                        await loadData('passwords');
+                        await loadCounts();
+                    } else {
+                        alert((res && res.error) || 'Delete failed');
+                    }
+                }
+            }
+        }
+    });
+
+    document.getElementById('addSubmit').addEventListener('click', async () => {
+        const entityType = document.getElementById('addType').value; // password | file | gpg
+        const editId = document.getElementById('editId').value;
+        const name = document.getElementById('addName').value;
+
+        let payload;
+        let response;
+        if (entityType === 'password') {
+            const label = name; // treat main input as Label
+            const group = document.getElementById('addGroup').value || null;
+            const address = document.getElementById('addAddress').value || null;
+            const username = document.getElementById('addUsername').value || null;
+            const pwd = document.getElementById('addValue').value;
+            if (!label || !pwd) { alert('Label and Password are required.'); return; }
+            if (editId) {
+                payload = { id: Number(editId), label, group, address, username, password: pwd };
+                response = await window.api.updatePassword(payload);
+            } else {
+                payload = { type: 'password', label, group, address, username, password: pwd };
+                response = await window.api.addItem(payload);
+            }
+        } else if (entityType === 'file') {
+            response = await window.api.addFileToVault();
+        } else {
+            const value = document.getElementById('addValue').value;
+            if (!name || !value) { alert('Please fill all required fields.'); return; }
+            payload = { type: entityType, name, value };
+            response = await window.api.addItem(payload);
+        }
+        if (response && response.success) {
+            bootstrap.Modal.getInstance(document.getElementById('addModal')).hide();
+            const tabId = Object.keys(typeMeta).find(k => typeMeta[k].singular === entityType) || 'passwords';
+            await loadData(tabId);
+            await loadCounts();
+        } else {
+            alert((response && response.error) || 'Operation failed');
+        }
+    });
+
     // Groups actions
     document.getElementById('addGroupBtn').addEventListener('click', async () => {
         const name = prompt('Group name');
@@ -455,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('files-body').addEventListener('click', async (e) => {
         const exportBtn = e.target.closest('.export-file');
         const deleteBtn = e.target.closest('.delete-file');
-        
+
         if (exportBtn) {
             const id = Number(exportBtn.dataset.id);
             if (Number.isFinite(id)) {

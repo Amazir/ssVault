@@ -28,5 +28,9 @@ contextBridge.exposeInMainWorld('api', {
     exportFileFromVault: (fileId) => ipcRenderer.invoke('export-file-from-vault', fileId),
     deleteFileFromVault: (fileId) => ipcRenderer.invoke('delete-file-from-vault', fileId),
     getFilesData: () => ipcRenderer.invoke('get-files-data'),
-    getFilesCount: () => ipcRenderer.invoke('get-files-count')
+    getFilesCount: () => ipcRenderer.invoke('get-files-count'),
+    // GPG operations
+    generateGpgKeypair: (payload) => ipcRenderer.invoke('generate-gpg-keypair', payload),
+    importGpgKeyFromFile: () => ipcRenderer.invoke('import-gpg-key-from-file'),
+    deleteGpgKey: (id) => ipcRenderer.invoke('delete-gpg-key', id)
 });

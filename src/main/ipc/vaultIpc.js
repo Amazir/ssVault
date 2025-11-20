@@ -1,10 +1,13 @@
 const { ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const VaultHandler = require('../handlers/vaultHandler');
 const { openVaultDB, closeCurrentDB, getCurrentDB } = require('../utils/db');
 const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('../utils/auth');
 const { setCurrentSession, getCurrentSessionHandler, clearSession, getCurrentVaultPath } = require('../utils/session');
-const { run, get, all, ensureBaseTables, ensurePasswordColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, getGroups, addGroup, deleteGroup } = require('../utils/db');
+const { run, get, all, ensureBaseTables, ensurePasswordColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, deleteGpg, getGroups, addGroup, deleteGroup } = require('../utils/db');
+
+const { generateGpgKeyPair, readAndValidateArmoredKey } = require('../utils/gpgUtils');
 
 function registerVaultIpcHandlers(mainWindow) {
     async function flushAndSeal() {
@@ -246,6 +249,83 @@ function registerVaultIpcHandlers(mainWindow) {
             if (!p) return '';
             return path.basename(p, '.vault');
         } catch (_) { return ''; }
+    });
+    
+    ipcMain.handle('generate-gpg-keypair', async (event, payload) => {
+        const db = getCurrentDB();
+        if (!db) return { success: false, error: 'No open vault/database.' };
+        if (!payload?.name) return { success: false, error: 'Name required.' };
+        try {
+            const keys = await generateGpgKeyPair(payload.userId || 'ssVault User');
+            // Add private key
+            await addGpg({
+                name: `${payload.name} Private`,
+                type: 'private',
+                content: keys.privateKeyArmored
+            }, db);
+            // Add public key
+            await addGpg({
+                name: `${payload.name} Public`,
+                type: 'public',
+                content: keys.publicKeyArmored
+            }, db);
+            await flushAndSeal();
+            return { success: true };
+        } catch (err) {
+            console.error('generate-gpg-keypair error:', err);
+            return { success: false, error: err.message };
+        }
+    });
+    
+    ipcMain.handle('import-gpg-key-from-file', async () => {
+        const { filePaths } = await dialog.showOpenDialog({
+            filters: [
+                { name: 'GPG Keys', extensions: ['asc', 'gpg', 'key', 'pub', 'priv'] },
+                { name: 'All Files', extensions: ['*'] }
+            ],
+            properties: ['openFile']
+        });
+        if (!filePaths?.[0]) return { success: false, error: 'No file selected.' };
+    
+        const filePath = filePaths[0];
+        let content;
+        try {
+            content = fs.readFileSync(filePath, 'utf8');
+        } catch (err) {
+            return { success: false, error: 'Failed to read file.' };
+        }
+    
+        const db = getCurrentDB();
+        if (!db) return { success: false, error: 'No open vault/database.' };
+    
+        try {
+            const validated = await readAndValidateArmoredKey(content);
+            const name = path.basename(filePath, path.extname(filePath)) || 'Imported Key';
+            await addGpg({
+                name: `${name} (${validated.type})`,
+                type: validated.type,
+                content
+            }, db);
+            await flushAndSeal();
+            return { success: true };
+        } catch (err) {
+            console.error('import-gpg-key-from-file error:', err);
+            return { success: false, error: err.message };
+        }
+    });
+    
+    ipcMain.handle('delete-gpg-key', async (event, id) => {
+        const db = getCurrentDB();
+        if (!db) return { success: false, error: 'No open vault/database.' };
+        if (typeof id !== 'number') return { success: false, error: 'Invalid id.' };
+        try {
+            const res = await deleteGpg(id, db);
+            await flushAndSeal();
+            return { success: true, changes: res && res.changes };
+        } catch (err) {
+            console.error('delete-gpg-key error:', err);
+            return { success: false, error: err.message };
+        }
     });
 }
 

@@ -4,7 +4,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     const isFirstTime = document.getElementById('isFirstTime').checked;
     const response = await window.api.login({ masterPassword, isFirstTime });
     if (response.success) {
-        window.api.loadDashboard(); // Go to dashboard
+        window.api.loadDashboard();
     } else {
         document.getElementById('error').textContent = response.error || 'Login error';
     }

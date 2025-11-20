@@ -151,6 +151,14 @@ async function ensurePasswordColumns(db = getCurrentDB()) {
     }
 }
 
+async function ensureGpgColumns(db = getCurrentDB()) {
+    const cols = await all(db, 'PRAGMA table_info(gpg)');
+    const have = (n) => cols.some(c => c.name === n);
+    if (!have('content')) {
+        await run(db, 'ALTER TABLE gpg ADD COLUMN content TEXT');
+    }
+}
+
 async function checkpoint(db = getCurrentDB()) {
     try { await run(db, 'PRAGMA wal_checkpoint(TRUNCATE)'); } catch (_) {}
 }
@@ -184,7 +192,8 @@ async function getFiles(db = getCurrentDB()) {
 
 async function getGpg(db = getCurrentDB()) {
     await ensureBaseTables(db);
-    return all(db, 'SELECT id, name, type AS value FROM gpg ORDER BY id DESC');
+    await ensureGpgColumns(db);
+    return all(db, 'SELECT id, name, type AS value, content FROM gpg ORDER BY id DESC');
 }
 
 async function getCounts(db = getCurrentDB()) {
@@ -243,7 +252,10 @@ async function addFile(payload, db = getCurrentDB()) {
 
 async function addGpg(payload, db = getCurrentDB()) {
     await ensureBaseTables(db);
-    const res = await run(db, 'INSERT INTO gpg (name, type) VALUES (?,?)', [payload.name, payload.value]);
+    await ensureGpgColumns(db);
+    const type = payload.type || 'key';
+    const content = payload.content || payload.value || '';
+    const res = await run(db, 'INSERT INTO gpg (name, type, content) VALUES (?,?,?)', [payload.name, type, content]);
     return { id: res && res.lastID };
 }
 
@@ -264,4 +276,16 @@ async function deleteGroup(id, db = getCurrentDB()) {
     return { changes: res && res.changes };
 }
 
-module.exports = { openVaultDB, getCurrentDB, closeCurrentDB, run, get, all, ensureBaseTables, ensurePasswordColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, getGroups, addGroup, deleteGroup };
+async function deleteGpg(id, db = getCurrentDB()) {
+    await ensureBaseTables(db);
+    const res = await run(db, 'DELETE FROM gpg WHERE id = ?', [id]);
+    return { changes: res && res.changes };
+}
+
+async function getGpgById(id, db = getCurrentDB()) {
+    await ensureBaseTables(db);
+    await ensureGpgColumns(db);
+    return get(db, 'SELECT * FROM gpg WHERE id = ?', [id]);
+}
+
+module.exports = { openVaultDB, getCurrentDB, closeCurrentDB, run, get, all, ensureBaseTables, ensurePasswordColumns, ensureGpgColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, deleteGpg, getGpgById, getGroups, addGroup, deleteGroup };

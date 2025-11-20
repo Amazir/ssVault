@@ -76,6 +76,14 @@ document.addEventListener('click', (e) => {
         }
         pathInput.value = path;
 
+        // Handle form submit (enter key)
+        const form = document.getElementById('openForm');
+        const formHandler = (e) => {
+            e.preventDefault();
+            submitHandler();
+        };
+        form.addEventListener('submit', formHandler);
+
         // Get submit button from html and init handler for submit
         const submitBtn = document.getElementById('openSubmit');
         const submitHandler = async () => {
@@ -100,8 +108,9 @@ document.addEventListener('click', (e) => {
             // Hide vault opener modal
             openModal.hide();
             
-            // Clean up event listener
-            submitBtn.removeEventListener('click', submitHandler); 
+            // Clean up event listeners
+            submitBtn.removeEventListener('click', submitHandler);
+            form.removeEventListener('submit', formHandler);
         };
         submitBtn.addEventListener('click', submitHandler);
     } else if (e.target.classList.contains('removeBtn')) {
