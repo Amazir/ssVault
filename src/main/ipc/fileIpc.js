@@ -4,6 +4,8 @@ const { getCurrentDB, ensureBaseTables } = require('../utils/db');
 const { getFiles, addFile, deleteFile, getFileById, getFilesCount, ensureFileColumns } = require('../utils/dbFiles');
 
 function registerFileIpcHandlers() {
+    console.log('Registering file IPC handlers...');
+    
     // File operations
     ipcMain.handle('add-file-to-vault', async () => {
         const handler = getCurrentSessionHandler();
@@ -134,6 +136,8 @@ function registerFileIpcHandlers() {
             return 0;
         }
     });
+    
+    console.log('File IPC handlers registered successfully');
 }
 
 module.exports = { registerFileIpcHandlers };

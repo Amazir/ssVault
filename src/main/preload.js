@@ -32,5 +32,8 @@ contextBridge.exposeInMainWorld('api', {
     // GPG operations
     generateGpgKeypair: (payload) => ipcRenderer.invoke('generate-gpg-keypair', payload),
     importGpgKeyFromFile: () => ipcRenderer.invoke('import-gpg-key-from-file'),
-    deleteGpgKey: (id) => ipcRenderer.invoke('delete-gpg-key', id)
+    exportGpgKey: (id) => ipcRenderer.invoke('export-gpg-key', id),
+    deleteGpgKey: (id) => ipcRenderer.invoke('delete-gpg-key', id),
+    gpgEncrypt: (payload) => ipcRenderer.invoke('gpg-encrypt', payload),
+    gpgDecrypt: (payload) => ipcRenderer.invoke('gpg-decrypt', payload)
 });

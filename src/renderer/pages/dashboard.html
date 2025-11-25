@@ -9,63 +9,73 @@
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
-<div class="container mt-4">
-    <div class="mb-4">
-        <h2 class="mb-1">Welcome in vault <span id="vaultName" class="text-primary"></span></h2>
-        <small class="text-muted">Quick overview</small>
-    </div>
-    <div class="row g-3" id="summaryRow">
-        <div class="col-12 col-sm-4">
-            <div class="card text-center">
-                <div class="card-body">
-                    <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
-                        <div>
-                            <div id="countPasswords" class="h3 mb-0">0</div>
-                            <small class="text-muted">Passwords</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-4">
-            <div class="card text-center">
-                <div class="card-body">
-                    <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
-                        <div>
-                            <div id="countFiles" class="h3 mb-0">0</div>
-                            <small class="text-muted">Files</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-4">
-            <div class="card text-center">
-                <div class="card-body">
-                    <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
-                        <div>
-                            <div id="countGpg" class="h3 mb-0">0</div>
-                            <small class="text-muted">GPG keys</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <ul class="nav nav-tabs mt-4" id="dashboardTabs">
+<div class="container-fluid mt-4 px-4">
+    <ul class="nav nav-tabs" id="dashboardTabs">
+        <li class="nav-item"><a class="nav-link active" href="#home" data-bs-toggle="tab"><i class="bi bi-house-door"></i> Home</a></li>
         <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle active" href="#" id="passwordsDropdown" data-bs-toggle="dropdown" role="button" aria-expanded="false">Passwords</a>
+            <a class="nav-link dropdown-toggle" href="#" id="passwordsDropdown" data-bs-toggle="dropdown" role="button" aria-expanded="false"><i class="bi bi-key"></i> Passwords</a>
             <ul class="dropdown-menu">
                 <li><a class="dropdown-item nav-link" href="#passwords" data-bs-toggle="tab">Passwords</a></li>
                 <li><a class="dropdown-item nav-link" href="#groups" data-bs-toggle="tab">Groups</a></li>
             </ul>
         </li>
-        <li class="nav-item"><a class="nav-link" href="#files" data-bs-toggle="tab">Files</a></li>
-        <li class="nav-item"><a class="nav-link" href="#gpg" data-bs-toggle="tab">GPG Keys</a></li>
+        <li class="nav-item"><a class="nav-link" href="#files" data-bs-toggle="tab"><i class="bi bi-folder"></i> Files</a></li>
+        <li class="nav-item"><a class="nav-link" href="#gpg" data-bs-toggle="tab"><i class="bi bi-shield-lock"></i> GPG Keys</a></li>
     </ul>
     <div class="tab-content mt-3">
-        <div class="tab-pane active" id="passwords">
+        <div class="tab-pane active" id="home">
+            <div class="mb-4">
+                <h2 class="mb-1">Welcome in vault <span id="vaultName" class="text-primary"></span></h2>
+                <small class="text-muted">Quick overview of your vault contents</small>
+            </div>
+            <div class="row g-3" id="summaryRow">
+                <div class="col-12 col-sm-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
+                                <div>
+                                    <div id="countPasswords" class="h3 mb-0">0</div>
+                                    <small class="text-muted">Passwords</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
+                                <div>
+                                    <div id="countFiles" class="h3 mb-0">0</div>
+                                    <small class="text-muted">Files</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:90px;height:90px;background:#f8f9fa;border:2px solid #dee2e6;">
+                                <div>
+                                    <div id="countGpg" class="h3 mb-0">0</div>
+                                    <small class="text-muted">GPG keys</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <h5>Quick Actions</h5>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-outline-primary quick-action" data-tab="passwords"><i class="bi bi-plus-circle"></i> Add Password</button>
+                    <button class="btn btn-outline-primary quick-action" data-tab="files"><i class="bi bi-upload"></i> Add File</button>
+                    <button class="btn btn-outline-primary quick-action" data-tab="gpg"><i class="bi bi-key"></i> Generate GPG Key</button>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane" id="passwords">
             <table class="table table-bordered">
                 <thead>
                 <tr>
@@ -143,15 +153,17 @@
                 <thead>
                 <tr>
                     <th>Key name</th>
+                    <th>User ID</th>
                     <th>Type</th>
                     <th style="width: 120px;">Actions</th>
                 </tr>
                 </thead>
                 <tbody id="gpg-body"></tbody>
             </table>
-            <div class="d-flex justify-content-end mt-2">
-                <button class="btn btn-success me-2" id="generateGpgBtn">Generate new key pair</button>
-                <button class="btn btn-primary add-btn" data-type="gpg">Add new</button>
+            <div class="d-flex justify-content-end mt-2 gap-2">
+                <button class="btn btn-info" id="openClipboardBtn"><i class="bi bi-clipboard-check"></i> Clipboard</button>
+                <button class="btn btn-success" id="generateGpgBtn"><i class="bi bi-key"></i> Generate</button>
+                <button class="btn btn-primary" id="importGpgBtn"><i class="bi bi-upload"></i> Import</button>
             </div>
         </div>
     </div>
@@ -195,21 +207,85 @@
             <div class="modal-body">
                 <form id="generateGpgForm">
                     <div class="mb-3">
-                        <label for="gpgKeyName" class="form-label">Key pair name <small class="text-muted">(for storage)</small></label>
+                        <label for="gpgKeyName" class="form-label">Key pair name <small class="text-muted">(for storage in vault)</small></label>
                         <input type="text" class="form-control" id="gpgKeyName" placeholder="e.g. My Personal Key" required>
                     </div>
+                    <hr>
                     <div class="mb-3">
-                        <label for="gpgUserId" class="form-label">User ID <small class="text-muted">(name <email>)</small></label>
-                        <input type="text" class="form-control" id="gpgUserId" placeholder="John Doe <john@example.com>" required>
+                        <label for="gpgUserName" class="form-label">Name <small class="text-muted">(required)</small></label>
+                        <input type="text" class="form-control" id="gpgUserName" placeholder="e.g. John Doe" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="gpgEmail" class="form-label">E-mail <small class="text-muted">(optional)</small></label>
+                        <input type="email" class="form-control" id="gpgEmail" placeholder="e.g. john@example.com">
+                    </div>
+                    <div class="mb-3">
+                        <label for="gpgExpiration" class="form-label">Expiration</label>
+                        <select class="form-select" id="gpgExpiration">
+                            <option value="0">Never expires</option>
+                            <option value="30">30 days</option>
+                            <option value="90">90 days</option>
+                            <option value="180">6 months</option>
+                            <option value="365">1 year</option>
+                            <option value="730">2 years</option>
+                            <option value="1825">5 years</option>
+                        </select>
                     </div>
                 </form>
                 <div class="alert alert-info">
-                    <small>This will generate a new ECC Curve25519 key pair and store both private and public keys in the vault.</small>
+                    <small><i class="bi bi-info-circle"></i> This will generate a new RSA 4096-bit key pair and store both private and public keys in the vault.</small>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-success" id="generateGpgSubmit">Generate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clipboard Modal -->
+<div class="modal fade" id="clipboardModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clipboard-check"></i> GPG Clipboard</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="clipboardInput" class="form-label">Text input</label>
+                    <textarea class="form-control" id="clipboardInput" rows="6" placeholder="Paste or type text here..."></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="clipboardOutput" class="form-label">Output</label>
+                    <textarea class="form-control" id="clipboardOutput" rows="6" readonly placeholder="Encrypted/Decrypted text will appear here..."></textarea>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="clipboardKeySelect" class="form-label">Select key</label>
+                        <select class="form-select" id="clipboardKeySelect">
+                            <option value="">-- Select a key --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end gap-2">
+                        <button class="btn btn-primary flex-fill" id="clipboardEncryptBtn" disabled>
+                            <i class="bi bi-lock"></i> Encrypt
+                        </button>
+                        <button class="btn btn-success flex-fill" id="clipboardDecryptBtn" disabled>
+                            <i class="bi bi-unlock"></i> Decrypt
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="clipboardCopyBtn">
+                    <i class="bi bi-clipboard"></i> Copy output
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="clipboardClearBtn">
+                    <i class="bi bi-trash"></i> Clear
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

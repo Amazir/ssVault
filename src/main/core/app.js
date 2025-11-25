@@ -18,8 +18,8 @@ function createWindow() {
     });
 
     mainWindow.loadFile(path.join(__dirname, '../../renderer/pages/vaults.html'));
-    // Tip: uncomment to debug startup performance
-    // mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // Open DevTools for debugging
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
     return mainWindow;
 }
 

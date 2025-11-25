@@ -16,12 +16,10 @@ function mapFileTypeFromName(filename = '') {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Small helpers to keep code terse
     const qs = (sel, root = document) => root.querySelector(sel);
     const byId = (id) => document.getElementById(id);
     const getTemplate = (id) => byId(id).content.firstElementChild;
 
-    // Map tab IDs to singular entity types and messages
     const typeMeta = {
         passwords: { singular: 'password', emptyTitle: 'No passwords yet', emptyDesc: 'Use the button below to add your first password.' },
         files: { singular: 'file', emptyTitle: 'No files yet', emptyDesc: 'Use the button below to add your first file.' },
@@ -31,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const passwordItems = new Map();
 
-    // Generic sort helper for simple arrays of objects
     function sortByKey(data, key, dir = 'asc') {
         const factor = dir === 'asc' ? 1 : -1;
         return [...data].sort((a, b) => {
@@ -65,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : tabId === 'files'
                     ? 5
                     : tabId === 'gpg'
-                        ? 2
+                        ? 4
                         : 2;
         body.innerHTML = `
             <tr>
@@ -123,7 +120,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Przygotuj dane + sort
         let rows = [...data];
 
         if (tabId === 'files') {
@@ -215,7 +211,22 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (tabId === 'gpg') {
             rows.forEach(item => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${item.name}</td><td>${item.value}</td>`;
+                const typeDisplay = item.value === 'private' ? 'Private Key' : item.value === 'public' ? 'Public Key' : item.value || 'Key';
+                const userId = item.user_id || '-';
+                tr.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${userId}</td>
+                    <td>${typeDisplay}</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary export-gpg" data-id="${item.id}" title="Export key">
+                                <i class="bi bi-download"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger delete-gpg" data-id="${item.id}" title="Delete key">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>`;
                 body.appendChild(tr);
             });
         } else if (tabId === 'groups') {
@@ -325,7 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.show();
     }
 
-    // Custom tab handling supports dropdown items acting as tabs
     function setupTabs() {
         const tabLinks = document.querySelectorAll('#dashboardTabs .nav-link[href^="#"]');
         tabLinks.forEach(link => {
@@ -333,20 +343,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault();
                 const target = link.getAttribute('href');
 
-                // Skip if target is just '#' (invalid selector)
                 if (!target || target === '#') return;
 
-                // Activate visual state in tabs (leave dropdown toggle as active always)
                 document.querySelectorAll('#dashboardTabs .nav-link').forEach(l => l.classList.remove('active'));
-                // Keep the dropdown toggle marked active
+
+                // Don't highlight dropdown toggle when inside dropdown is selected
                 const ddToggle = document.getElementById('passwordsDropdown');
-                if (ddToggle) ddToggle.classList.add('active');
+                if (target === '#passwords' || target === '#groups') {
+                    if (ddToggle) ddToggle.classList.add('active');
+                }
                 link.classList.add('active');
-                // Show tab content
+
                 document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
                 const pane = document.querySelector(target);
                 if (pane) pane.classList.add('active');
-                // Load data for shown tab
+
                 const tabId = target.slice(1);
                 if (['passwords','files','gpg','groups'].includes(tabId)) {
                     loadData(tabId);
@@ -355,10 +366,41 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Setup custom tabs
     setupTabs();
 
-    // Plus buttons in headers
+    // Quick actions from Home tab
+    document.querySelectorAll('.quick-action').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tab = e.currentTarget.dataset.tab;
+            if (tab === 'passwords') {
+                // Switch to passwords tab and open add modal
+                document.querySelector('a[href="#passwords"]').click();
+                setTimeout(() => openAddModal('password'), 100);
+            } else if (tab === 'files') {
+                // Switch to files tab and trigger add file
+                document.querySelector('a[href="#files"]').click();
+                setTimeout(async () => {
+                    const res = await window.api.addFileToVault();
+                    if (res && res.success) {
+                        await loadData('files');
+                        await loadCounts();
+                    }
+                }, 100);
+            } else if (tab === 'gpg') {
+                // Switch to GPG tab and open generate modal
+                document.querySelector('a[href="#gpg"]').click();
+                setTimeout(() => {
+                    const modal = new bootstrap.Modal(byId('generateGpgModal'));
+                    byId('gpgKeyName').value = '';
+                    byId('gpgUserName').value = '';
+                    byId('gpgEmail').value = '';
+                    byId('gpgExpiration').value = '0';
+                    modal.show();
+                }, 100);
+            }
+        });
+    });
+
     document.querySelectorAll('.add-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const entityType = e.currentTarget.dataset.type; // password | file | gpg
@@ -366,7 +408,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Actions in passwords table (edit/delete)
     document.getElementById('passwords-body').addEventListener('click', async (e) => {
         const editBtn = e.target.closest('.edit-password');
         const delBtn = e.target.closest('.delete-password');
@@ -429,7 +470,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Groups actions
     document.getElementById('addGroupBtn').addEventListener('click', async () => {
         const name = prompt('Group name');
         if (!name) return;
@@ -455,7 +495,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // File operations event handlers
     document.getElementById('files-body').addEventListener('click', async (e) => {
         const exportBtn = e.target.closest('.export-file');
         const deleteBtn = e.target.closest('.delete-file');
@@ -486,12 +525,258 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Click-to-sort for all tables
+    // GPG Keys - Generate new key pair
+    const generateGpgBtn = byId('generateGpgBtn');
+    if (generateGpgBtn) {
+        generateGpgBtn.addEventListener('click', () => {
+            const modal = new bootstrap.Modal(byId('generateGpgModal'));
+            byId('gpgKeyName').value = '';
+            byId('gpgUserName').value = '';
+            byId('gpgEmail').value = '';
+            byId('gpgExpiration').value = '0';
+            modal.show();
+        });
+    }
+
+    // GPG Keys - Generate submit
+    const generateGpgSubmit = byId('generateGpgSubmit');
+    if (generateGpgSubmit) {
+        generateGpgSubmit.addEventListener('click', async () => {
+            const keyName = byId('gpgKeyName').value.trim();
+            const userName = byId('gpgUserName').value.trim();
+            const email = byId('gpgEmail').value.trim();
+            const expirationDays = parseInt(byId('gpgExpiration').value, 10) || 0;
+
+            if (!keyName) {
+                alert('Please enter a key pair name.');
+                return;
+            }
+            if (!userName) {
+                alert('Please enter your name.');
+                return;
+            }
+
+            generateGpgSubmit.disabled = true;
+            generateGpgSubmit.textContent = 'Generating...';
+
+            try {
+                const res = await window.api.generateGpgKeypair({
+                    name: keyName,
+                    userName,
+                    email: email || undefined,
+                    expirationDays
+                });
+                if (res && res.success) {
+                    bootstrap.Modal.getInstance(byId('generateGpgModal')).hide();
+                    await loadData('gpg');
+                    await loadCounts();
+                    alert('GPG key pair generated successfully!');
+                } else {
+                    alert((res && res.error) || 'Failed to generate key pair.');
+                }
+            } catch (err) {
+                alert('Error: ' + (err.message || err));
+            } finally {
+                generateGpgSubmit.disabled = false;
+                generateGpgSubmit.textContent = 'Generate';
+            }
+        });
+    }
+
+    // GPG Keys - Delete key and Export key
+    byId('gpg-body').addEventListener('click', async (e) => {
+        const deleteBtn = e.target.closest('.delete-gpg');
+        const exportBtn = e.target.closest('.export-gpg');
+        if (deleteBtn) {
+            const id = Number(deleteBtn.dataset.id);
+            if (Number.isFinite(id)) {
+                if (confirm('Delete this GPG key? This action cannot be undone.')) {
+                    const res = await window.api.deleteGpgKey(id);
+                    if (res && res.success) {
+                        await loadData('gpg');
+                        await loadCounts();
+                    } else {
+                        alert((res && res.error) || 'Delete failed');
+                    }
+                }
+            }
+        } else if (exportBtn) {
+            const id = Number(exportBtn.dataset.id);
+            if (Number.isFinite(id)) {
+                const res = await window.api.exportGpgKey(id);
+                if (res && res.success) {
+                    alert(`Key exported to: ${res.exportPath}`);
+                } else {
+                    alert((res && res.error) || 'Export failed');
+                }
+            }
+        }
+    });
+
+    // GPG Keys - Import key from file
+    const importGpgBtn = byId('importGpgBtn');
+    if (importGpgBtn) {
+        importGpgBtn.addEventListener('click', async () => {
+            const res = await window.api.importGpgKeyFromFile();
+            if (res && res.success) {
+                await loadData('gpg');
+                await loadCounts();
+                alert('GPG key imported successfully!');
+            } else if (res && res.error && res.error !== 'No file selected.') {
+                alert((res && res.error) || 'Import failed');
+            }
+        });
+    }
+
+    // Clipboard modal
+    let clipboardKeys = [];
+    const openClipboardBtn = byId('openClipboardBtn');
+    if (openClipboardBtn) {
+        openClipboardBtn.addEventListener('click', async () => {
+            const modal = new bootstrap.Modal(byId('clipboardModal'));
+            // Load GPG keys for select
+            const select = byId('clipboardKeySelect');
+            select.innerHTML = '<option value="">-- Select a key --</option>';
+            try {
+                clipboardKeys = await window.api.getData('gpg') || [];
+                if (clipboardKeys.length > 0) {
+                    clipboardKeys.forEach(k => {
+                        const opt = document.createElement('option');
+                        opt.value = k.id;
+                        const typeLabel = k.value === 'private' ? '[Private]' : k.value === 'public' ? '[Public]' : '';
+                        opt.textContent = `${k.name} ${typeLabel}`;
+                        opt.dataset.type = k.value;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load GPG keys for clipboard:', err);
+            }
+            // Clear fields
+            byId('clipboardInput').value = '';
+            byId('clipboardOutput').value = '';
+            // Update button states
+            updateClipboardButtons();
+            modal.show();
+        });
+    }
+
+    // Update clipboard buttons based on selected key type
+    function updateClipboardButtons() {
+        const select = byId('clipboardKeySelect');
+        const selectedOption = select.options[select.selectedIndex];
+        const keyType = selectedOption?.dataset?.type || '';
+        
+        byId('clipboardEncryptBtn').disabled = keyType !== 'public';
+        byId('clipboardDecryptBtn').disabled = keyType !== 'private';
+    }
+
+    // Key select change handler
+    const clipboardKeySelect = byId('clipboardKeySelect');
+    if (clipboardKeySelect) {
+        clipboardKeySelect.addEventListener('change', updateClipboardButtons);
+    }
+
+    // Clipboard - Encrypt
+    const clipboardEncryptBtn = byId('clipboardEncryptBtn');
+    if (clipboardEncryptBtn) {
+        clipboardEncryptBtn.addEventListener('click', async () => {
+            const text = byId('clipboardInput').value;
+            const keyId = Number(byId('clipboardKeySelect').value);
+            
+            if (!text) {
+                alert('Please enter text to encrypt.');
+                return;
+            }
+            if (!keyId) {
+                alert('Please select a public key.');
+                return;
+            }
+
+            clipboardEncryptBtn.disabled = true;
+            clipboardEncryptBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Encrypting...';
+
+            try {
+                const res = await window.api.gpgEncrypt({ text, keyId });
+                if (res && res.success) {
+                    byId('clipboardOutput').value = res.result;
+                } else {
+                    alert((res && res.error) || 'Encryption failed.');
+                }
+            } catch (err) {
+                alert('Error: ' + (err.message || err));
+            } finally {
+                clipboardEncryptBtn.innerHTML = '<i class="bi bi-lock"></i> Encrypt';
+                updateClipboardButtons();
+            }
+        });
+    }
+
+    // Clipboard - Decrypt
+    const clipboardDecryptBtn = byId('clipboardDecryptBtn');
+    if (clipboardDecryptBtn) {
+        clipboardDecryptBtn.addEventListener('click', async () => {
+            const text = byId('clipboardInput').value;
+            const keyId = Number(byId('clipboardKeySelect').value);
+            
+            if (!text) {
+                alert('Please enter encrypted text to decrypt.');
+                return;
+            }
+            if (!keyId) {
+                alert('Please select a private key.');
+                return;
+            }
+
+            clipboardDecryptBtn.disabled = true;
+            clipboardDecryptBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Decrypting...';
+
+            try {
+                const res = await window.api.gpgDecrypt({ text, keyId });
+                if (res && res.success) {
+                    byId('clipboardOutput').value = res.result;
+                } else {
+                    alert((res && res.error) || 'Decryption failed.');
+                }
+            } catch (err) {
+                alert('Error: ' + (err.message || err));
+            } finally {
+                clipboardDecryptBtn.innerHTML = '<i class="bi bi-unlock"></i> Decrypt';
+                updateClipboardButtons();
+            }
+        });
+    }
+
+    // Clipboard - Copy output
+    const clipboardCopyBtn = byId('clipboardCopyBtn');
+    if (clipboardCopyBtn) {
+        clipboardCopyBtn.addEventListener('click', () => {
+            const output = byId('clipboardOutput').value;
+            if (output) {
+                navigator.clipboard.writeText(output).then(() => {
+                    alert('Copied to clipboard!');
+                }).catch(err => {
+                    alert('Failed to copy: ' + err);
+                });
+            } else {
+                alert('Nothing to copy.');
+            }
+        });
+    }
+
+    // Clipboard - Clear
+    const clipboardClearBtn = byId('clipboardClearBtn');
+    if (clipboardClearBtn) {
+        clipboardClearBtn.addEventListener('click', () => {
+            byId('clipboardInput').value = '';
+            byId('clipboardOutput').value = '';
+        });
+    }
+
     document.querySelectorAll('th[data-sort-key]').forEach(th => {
         th.style.cursor = 'pointer';
         th.addEventListener('click', () => {
             const key = th.getAttribute('data-sort-key');
-            // Ustal aktywną zakładkę
             const activePane = document.querySelector('.tab-pane.active');
             if (!activePane) return;
             const tabId = activePane.id;
@@ -499,7 +784,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const state = sortState[tabId];
             if (!state) return;
 
-            // Toggle kierunku, gdy klikamy ten sam klucz
             const nextDir =
                 state.key === key
                     ? (state.dir === 'asc' ? 'desc' : 'asc')
@@ -510,7 +794,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Initial load
     loadVaultName();
     loadCounts();
     loadData('passwords');

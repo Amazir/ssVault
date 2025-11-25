@@ -7,7 +7,7 @@ const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('.
 const { setCurrentSession, getCurrentSessionHandler, clearSession, getCurrentVaultPath } = require('../utils/session');
 const { run, get, all, ensureBaseTables, ensurePasswordColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, deleteGpg, getGroups, addGroup, deleteGroup } = require('../utils/db');
 
-const { generateGpgKeyPair, readAndValidateArmoredKey } = require('../utils/gpgUtils');
+const { generateGpgKeyPair, readAndValidateArmoredKey, encryptText, decryptText } = require('../utils/gpgUtils');
 
 function registerVaultIpcHandlers(mainWindow) {
     async function flushAndSeal() {
@@ -254,20 +254,31 @@ function registerVaultIpcHandlers(mainWindow) {
     ipcMain.handle('generate-gpg-keypair', async (event, payload) => {
         const db = getCurrentDB();
         if (!db) return { success: false, error: 'No open vault/database.' };
-        if (!payload?.name) return { success: false, error: 'Name required.' };
+        if (!payload?.name) return { success: false, error: 'Key pair name required.' };
+        if (!payload?.userName) return { success: false, error: 'User name required.' };
         try {
-            const keys = await generateGpgKeyPair(payload.userId || 'ssVault User');
+            const keys = await generateGpgKeyPair({
+                name: payload.userName,
+                email: payload.email || undefined,
+                expirationDays: payload.expirationDays || 0
+            });
+            // Build user ID string (like in GPG: "Name <email>")
+            const userIdStr = payload.email
+                ? `${payload.userName} <${payload.email}>`
+                : payload.userName;
             // Add private key
             await addGpg({
-                name: `${payload.name} Private`,
+                name: `${payload.name} (Private)`,
                 type: 'private',
-                content: keys.privateKeyArmored
+                content: keys.privateKeyArmored,
+                userId: userIdStr
             }, db);
             // Add public key
             await addGpg({
-                name: `${payload.name} Public`,
+                name: `${payload.name} (Public)`,
                 type: 'public',
-                content: keys.publicKeyArmored
+                content: keys.publicKeyArmored,
+                userId: userIdStr
             }, db);
             await flushAndSeal();
             return { success: true };
@@ -324,6 +335,72 @@ function registerVaultIpcHandlers(mainWindow) {
             return { success: true, changes: res && res.changes };
         } catch (err) {
             console.error('delete-gpg-key error:', err);
+            return { success: false, error: err.message };
+        }
+    });
+    
+    ipcMain.handle('export-gpg-key', async (event, id) => {
+        const db = getCurrentDB();
+        if (!db) return { success: false, error: 'No open vault/database.' };
+        if (typeof id !== 'number') return { success: false, error: 'Invalid id.' };
+        try {
+            const { getGpgById } = require('../utils/db');
+            const key = await getGpgById(id, db);
+            if (!key) return { success: false, error: 'Key not found.' };
+            
+            const extension = key.type === 'private' ? 'priv.asc' : 'pub.asc';
+            const defaultName = `${key.name.replace(/[^a-zA-Z0-9]/g, '_')}.${extension}`;
+            
+            const { filePath } = await dialog.showSaveDialog({
+                defaultPath: defaultName,
+                filters: [
+                    { name: 'GPG Keys', extensions: ['asc', 'gpg', 'key'] },
+                    { name: 'All Files', extensions: ['*'] }
+                ]
+            });
+            
+            if (!filePath) return { success: false, error: 'Export cancelled.' };
+            
+            fs.writeFileSync(filePath, key.content, 'utf8');
+            return { success: true, exportPath: filePath };
+        } catch (err) {
+            console.error('export-gpg-key error:', err);
+            return { success: false, error: err.message };
+        }
+    });
+    
+    ipcMain.handle('gpg-encrypt', async (event, { text, keyId }) => {
+        const db = getCurrentDB();
+        if (!db) return { success: false, error: 'No open vault/database.' };
+        if (!text) return { success: false, error: 'Text required.' };
+        if (!keyId) return { success: false, error: 'Key ID required.' };
+        try {
+            const { getGpgById } = require('../utils/db');
+            const key = await getGpgById(keyId, db);
+            if (!key) return { success: false, error: 'Key not found.' };
+            if (key.type !== 'public') return { success: false, error: 'Encryption requires a public key.' };
+            const encrypted = await encryptText(text, key.content);
+            return { success: true, result: encrypted };
+        } catch (err) {
+            console.error('gpg-encrypt error:', err);
+            return { success: false, error: err.message };
+        }
+    });
+    
+    ipcMain.handle('gpg-decrypt', async (event, { text, keyId }) => {
+        const db = getCurrentDB();
+        if (!db) return { success: false, error: 'No open vault/database.' };
+        if (!text) return { success: false, error: 'Text required.' };
+        if (!keyId) return { success: false, error: 'Key ID required.' };
+        try {
+            const { getGpgById } = require('../utils/db');
+            const key = await getGpgById(keyId, db);
+            if (!key) return { success: false, error: 'Key not found.' };
+            if (key.type !== 'private') return { success: false, error: 'Decryption requires a private key.' };
+            const decrypted = await decryptText(text, key.content);
+            return { success: true, result: decrypted };
+        } catch (err) {
+            console.error('gpg-decrypt error:', err);
             return { success: false, error: err.message };
         }
     });
