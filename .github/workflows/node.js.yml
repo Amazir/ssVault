@@ -30,9 +30,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Build distributables with Electron Forge
+      # Set environment variables for optimized builds
+      - name: Set build optimizations
+        run: |
+          echo "FORGE_CONFIG_OPTIMIZED=true" >> $GITHUB_ENV
+          echo "NODE_OPTIONS=--max-old-space-size=4096" >> $GITHUB_ENV
+
+      # Build distributables with Electron Forge (uses our optimized forge.config.js)
       - name: Make distributables
         run: npm run make
+
+      # Run our custom optimization script to further reduce size
+      - name: Apply additional optimizations
+        run: |
+          node build-optimize.js || true
+
+      # Check build sizes
+      - name: Report build sizes
+        run: |
+          echo "Build artifacts sizes:"
+          find out -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" | while read file; do
+            size=$(du -h "$file" | cut -f1)
+            echo "$file: $size"
+          done
 
       # Upload all generated artifacts from the out/ directory
       - name: Upload artifacts
