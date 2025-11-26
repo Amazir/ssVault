@@ -2,14 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { dialog } = require('electron');
+const openpgp = require('openpgp');
 
-/**
- * File Manager for handling encrypted file storage in vault
- */
+
 class FileManager {
-    constructor(tempDir) {
+    constructor(tempDir, vaultPublicKey = null, vaultPrivateKey = null, password = null) {
         this.tempDir = tempDir;
         this.filesDir = path.join(tempDir, 'files');
+        this.vaultPublicKey = vaultPublicKey;
+        this.vaultPrivateKey = vaultPrivateKey;
+        this.password = password;
         this.ensureFilesDirectory();
     }
 
@@ -78,31 +80,35 @@ class FileManager {
     }
 
     /**
-     * Store file in vault with encryption-ready structure
+     * Store file in vault with GPG encryption
      */
     async storeFileInVault(sourceFilePath, originalName, shouldMove = false) {
         try {
-            // Generate stored filename
-            const storedFilename = this.generateStoredFilename(originalName);
+            // Generate stored filename with .gpg extension
+            const storedFilename = this.generateStoredFilename(originalName) + '.gpg';
             const destPath = path.join(this.filesDir, storedFilename);
 
-            // Get file stats
-            const stats = fs.statSync(sourceFilePath);
-            const fileSize = stats.size;
-            const fileHash = this.calculateFileHash(sourceFilePath);
+            // Read source file
+            const fileBuffer = fs.readFileSync(sourceFilePath);
+            const fileSize = fileBuffer.length;
+            const fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
 
-            // Copy or move file to vault
+            // Encrypt file with GPG using vault password
+            const encryptedData = await this.encryptFile(fileBuffer);
+            
+            // Write encrypted file
+            fs.writeFileSync(destPath, encryptedData);
+
+            // Delete original if move operation
             if (shouldMove) {
-                fs.renameSync(sourceFilePath, destPath);
-            } else {
-                fs.copyFileSync(sourceFilePath, destPath);
+                fs.unlinkSync(sourceFilePath);
             }
 
             return {
                 originalName,
                 storedFilename,
-                size: fileSize,
-                hash: fileHash,
+                size: fileSize, // Original size before encryption
+                hash: fileHash, // Hash of original file for integrity
                 addedDate: new Date().toISOString()
             };
         } catch (error) {
@@ -111,18 +117,79 @@ class FileManager {
     }
 
     /**
-     * Retrieve file from vault
+     * Encrypt file data using OpenPGP with GPG public key (asymmetric encryption)
      */
-    getFileFromVault(storedFilename) {
+    async encryptFile(fileBuffer) {
+        if (!this.vaultPublicKey) {
+            throw new Error('No vault public key set for FileManager');
+        }
+
+        const publicKey = await openpgp.readKey({
+            armoredKey: this.vaultPublicKey
+        });
+        
+        const message = await openpgp.createMessage({ binary: fileBuffer });
+        const encrypted = await openpgp.encrypt({
+            message,
+            encryptionKeys: publicKey, // Asymmetric encryption with public key
+            format: 'binary',
+            config: {
+                aeadProtect: false,
+                preferredSymmetricAlgorithm: openpgp.enums.symmetric.aes256
+            }
+        });
+        
+        return Buffer.from(encrypted);
+    }
+
+    /**
+     * Decrypt file data using OpenPGP with GPG private key (asymmetric decryption)
+     */
+    async decryptFile(encryptedBuffer) {
+        if (!this.vaultPrivateKey) {
+            throw new Error('No vault private key set for FileManager');
+        }
+        
+        if (!this.password) {
+            throw new Error('No password set for FileManager');
+        }
+
+        // Decrypt the private key with vault password
+        const privateKey = await openpgp.decryptKey({
+            privateKey: await openpgp.readPrivateKey({ armoredKey: this.vaultPrivateKey }),
+            passphrase: this.password
+        });
+
+        const message = await openpgp.readMessage({ binaryMessage: encryptedBuffer });
+        const { data: decrypted } = await openpgp.decrypt({
+            message,
+            decryptionKeys: privateKey, // Asymmetric decryption with private key
+            format: 'binary'
+        });
+        
+        return Buffer.from(decrypted);
+    }
+
+    /**
+     * Retrieve and decrypt file from vault
+     */
+    async getFileFromVault(storedFilename) {
         const filePath = path.join(this.filesDir, storedFilename);
         if (!fs.existsSync(filePath)) {
             throw new Error('File not found in vault');
         }
-        return filePath;
+        
+        // Read encrypted file
+        const encryptedBuffer = fs.readFileSync(filePath);
+        
+        // Decrypt file
+        const decryptedBuffer = await this.decryptFile(encryptedBuffer);
+        
+        return decryptedBuffer;
     }
 
     /**
-     * Export file from vault to chosen location
+     * Export file from vault to chosen location (decrypted)
      */
     async exportFileFromVault(storedFilename, originalName) {
         const result = await dialog.showSaveDialog({
@@ -134,8 +201,11 @@ class FileManager {
             return null;
         }
 
-        const sourceFile = this.getFileFromVault(storedFilename);
-        fs.copyFileSync(sourceFile, result.filePath);
+        // Get decrypted file data
+        const decryptedBuffer = await this.getFileFromVault(storedFilename);
+        
+        // Write decrypted file to chosen location
+        fs.writeFileSync(result.filePath, decryptedBuffer);
         
         return result.filePath;
     }
@@ -151,12 +221,12 @@ class FileManager {
     }
 
     /**
-     * Verify file integrity
+     * Verify file integrity (hash of decrypted content)
      */
-    verifyFileIntegrity(storedFilename, expectedHash) {
-        const filePath = this.getFileFromVault(storedFilename);
+    async verifyFileIntegrity(storedFilename, expectedHash) {
+        const decryptedBuffer = await this.getFileFromVault(storedFilename);
         const actualHash = crypto.createHash('sha256')
-            .update(fs.readFileSync(filePath))
+            .update(decryptedBuffer)
             .digest('hex');
         return actualHash === expectedHash;
     }

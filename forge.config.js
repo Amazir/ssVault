@@ -7,10 +7,40 @@ module.exports = {
   packagerConfig: {
     asar: true,
     prune: true,
+    extraResource: [],
+    extraModule: [],
+    portable: false,
+    ignorePatchUpdates: true,
     ignore: [
       /^(?:\.git|out|dist|diagramy)(?:\/|$)/,
       /\.map$/,
-      /__tests__|__mocks__|\.md$|LICENSE|CHANGELOG/i
+      /__tests__|__mocks__|\.md$|LICENSE|CHANGELOG/i,
+      /^node_modules\/bootstrap\/.*$/,
+      /^node_modules\/adm-zip\/.*$/,
+      /^node_modules\/bcrypt\/.*$/,
+      /^node_modules\/electron-store\/.*$/,
+      /^node_modules\/openpgp\/.*$/,
+      /^node_modules\/@journeyapps\/sqlcipher\/.*$/,
+      /^node_modules\/electron-squirrel-startup\/.*$/,
+      /^node_modules\/adm-zip\/test/,
+      /^node_modules\/bcrypt\/test/,
+      /^node_modules\/electron-store\/test/,
+      /^node_modules\/openpgp\/test/,
+      /^node_modules\/.*\.md$/,
+      /^node_modules\/.*\.txt$/,
+      /^node_modules\/.*\.LICENSE$/,
+      /^node_modules\/.*\.CHANGELOG$/,
+      /^node_modules\/.*examples\//,
+      /^node_modules\/.*docs\//,
+      /^node_modules\/.*benchmark\//,
+      /^node_modules\/.*demo\//,
+      /^node_modules\/.*sample\//,
+      /^node_modules\/.*test\//,
+      /^node_modules\/.*spec\//,
+      /^node_modules\/.*__tests__\//,
+      /^node_modules\/.*__mocks__\//,
+      /^node_modules\/.*__fixtures__\//,
+      /^node_modules\/.*__stories__\//
     ],
     icon: 'src/resources/images/icon/icon'
   },
@@ -31,7 +61,7 @@ module.exports = {
 
           const localesDir = path.join(resourcesDir, 'locales');
           if (fs.existsSync(localesDir)) {
-            const keep = new Set(['en-US.pak', 'pl.pak']);
+            const keep = new Set(['en-US.pak']);
             for (const entry of fs.readdirSync(localesDir)) {
               if (!keep.has(entry)) {
                 const p = path.join(localesDir, entry);
@@ -70,10 +100,31 @@ module.exports = {
             }
           } catch {}
 
-          for (const dirName of ['.cache', 'obj', 'gen']) {
+          for (const dirName of ['.cache', 'obj', 'gen', 'temp']) {
             const p = path.join(appPath, dirName);
             if (fs.existsSync(p)) {
               try { fs.rmSync(p, { recursive: true, force: true }); } catch {}
+            }
+          }
+
+          const resourcesParent = path.join(resourcesDir, '..');
+          const extraLibs = path.join(resourcesParent, 'lib');
+          if (fs.existsSync(extraLibs)) {
+            const libEntries = fs.readdirSync(extraLibs);
+            for (const entry of libEntries) {
+              if (!entry.includes('libffmpeg') && !entry.includes('libcef') && !entry.includes('libgles')) {
+                try { fs.rmSync(path.join(extraLibs, entry), { force: true }); } catch {}
+              }
+            }
+          }
+
+          const binDir = path.join(resourcesParent, 'bin');
+          if (fs.existsSync(binDir)) {
+            const binEntries = fs.readdirSync(binDir);
+            for (const entry of binEntries) {
+              if (!entry.includes('cef') && !entry.includes('electron') && !entry.includes('sqlite')) {
+                try { fs.rmSync(path.join(binDir, entry), { force: true }); } catch {}
+              }
             }
           }
         }

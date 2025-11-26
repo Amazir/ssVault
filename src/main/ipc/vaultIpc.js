@@ -1,11 +1,13 @@
 const { ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcrypt');
 const VaultHandler = require('../handlers/vaultHandler');
 const { openVaultDB, closeCurrentDB, getCurrentDB } = require('../utils/db');
 const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('../utils/auth');
 const { setCurrentSession, getCurrentSessionHandler, clearSession, getCurrentVaultPath } = require('../utils/session');
-const { run, get, all, ensureBaseTables, ensurePasswordColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, deleteGpg, getGroups, addGroup, deleteGroup } = require('../utils/db');
+const { run, get, all, ensureBaseTables, ensurePasswordColumns, ensureAuthColumns, ensureLoginAttemptsTable, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, deleteGpg, getGroups, addGroup, deleteGroup } = require('../utils/db');
+const LoginAttemptsManager = require('../utils/loginAttempts');
 
 const { generateGpgKeyPair, readAndValidateArmoredKey, encryptText, decryptText } = require('../utils/gpgUtils');
 
@@ -55,21 +57,69 @@ function registerVaultIpcHandlers(mainWindow) {
     });
 
     ipcMain.handle('open-vault', async (event, { vaultPath, password }) => {
+        let tempHandler = null;
         try {
-            const handler = new VaultHandler(vaultPath, password);
-
-            await handler.openVault();
-
-            const isValid = await validateMasterPasswordForVault(password);
-            if (!isValid) {
-                handler.cleanTempDir();
-                return { error: 'Invalid password' };
+            // Step 1: Temporarily open vault to access login_attempts table
+            tempHandler = new VaultHandler(vaultPath, password);
+            await tempHandler.openVault();
+            
+            const db = getCurrentDB();
+            if (!db) {
+                if (tempHandler) tempHandler.cleanTempDir();
+                return { error: 'Database not accessible' };
             }
-
-            setCurrentSession(vaultPath, password, handler);
+            
+            // Ensure tables exist (for old vaults without login_attempts)
+            await ensureAuthColumns(db);
+            await ensureLoginAttemptsTable(db);
+            
+            // Step 2: Check lockout status
+            const attemptsManager = new LoginAttemptsManager(db);
+            const lockStatus = await attemptsManager.checkLockout();
+            
+            if (lockStatus.locked) {
+                await closeCurrentDB();
+                if (tempHandler) tempHandler.cleanTempDir();
+                return {
+                    error: `Too many failed attempts. Vault locked for ${lockStatus.remainingSeconds} seconds.`
+                };
+            }
+            
+            // Step 3: Validate password
+            const isValid = await validateMasterPasswordForVault(password);
+            
+            if (!isValid) {
+                // Record failed attempt
+                const result = await attemptsManager.recordFailedAttempt();
+                await closeCurrentDB();
+                if (tempHandler) tempHandler.cleanTempDir();
+                
+                if (result.locked) {
+                    return {
+                        error: `Invalid password. Vault locked for ${result.remainingSeconds} seconds.`
+                    };
+                }
+                
+                return {
+                    error: `Invalid password. ${result.attemptsRemaining} attempt(s) remaining.`
+                };
+            }
+            
+            // Step 4: Success - reset attempts counter
+            await attemptsManager.resetAttempts();
+            
+            // Step 5: Set session (handler already opened)
+            setCurrentSession(vaultPath, password, tempHandler);
             return { success: true };
+            
         } catch (err) {
             console.error('open-vault error:', err);
+            if (tempHandler) {
+                try {
+                    await closeCurrentDB();
+                    tempHandler.cleanTempDir();
+                } catch (_) {}
+            }
             return { error: err.message };
         }
     });

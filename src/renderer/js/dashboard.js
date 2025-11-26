@@ -179,7 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 qs('.cell-group', tr).textContent = item.group_name || '';
                 qs('.cell-address', tr).textContent = item.address || '';
                 qs('.cell-username', tr).textContent = item.username || '';
-                qs('.cell-password', tr).textContent = item.password || '';
+                qs('.password-visible', tr).textContent = item.password || '';
+                qs('.copy-password', tr).dataset.password = item.password || '';
                 qs('.edit-password', tr).dataset.id = item.id;
                 qs('.delete-password', tr).dataset.id = item.id;
                 body.appendChild(tr);
@@ -266,6 +267,101 @@ document.addEventListener('DOMContentLoaded', () => {
             byId('countGpg').textContent = '0';
         }
     }
+    async function loadGroupsIntoSelect(selectedGroup = '') {
+        try {
+            const groups = await window.api.getGroups();
+            const select = document.getElementById('addGroup');
+            if (!select) return;
+            select.innerHTML = '<option value="">Default</option>';
+            if (groups && groups.length > 0) {
+                groups.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.name;
+                    opt.textContent = g.name;
+                    if (g.name === selectedGroup) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (err) {
+            console.error('Failed to load groups:', err);
+        }
+    }
+
+    function generatePassword(length, includeUpper, includeLower, includeNumbers, includeSymbols) {
+        const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const lower = 'abcdefghijklmnopqrstuvwxyz';
+        const numbers = '0123456789';
+        const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+        
+        let charset = '';
+        if (includeUpper) charset += upper;
+        if (includeLower) charset += lower;
+        if (includeNumbers) charset += numbers;
+        if (includeSymbols) charset += symbols;
+        
+        if (!charset) return '';
+        
+        let password = '';
+        const array = new Uint32Array(length);
+        crypto.getRandomValues(array);
+        for (let i = 0; i < length; i++) {
+            password += charset[array[i] % charset.length];
+        }
+        return password;
+    }
+
+    function calculatePasswordStrength(password) {
+        let score = 0;
+        if (!password) return { score: 0, text: 'No password', color: '#dc3545' };
+        
+        if (password.length >= 8) score += 20;
+        if (password.length >= 12) score += 20;
+        if (password.length >= 16) score += 10;
+        if (/[a-z]/.test(password)) score += 10;
+        if (/[A-Z]/.test(password)) score += 10;
+        if (/[0-9]/.test(password)) score += 10;
+        if (/[^a-zA-Z0-9]/.test(password)) score += 20;
+        
+        if (score <= 30) return { score: 30, text: 'Weak', color: '#dc3545' };
+        if (score <= 60) return { score: 60, text: 'Medium', color: '#ffc107' };
+        if (score <= 80) return { score: 80, text: 'Strong', color: '#28a745' };
+        return { score: 100, text: 'Very Strong', color: '#28a745' };
+    }
+
+    let passwordGeneratorTargetInputId = null;
+
+    function openPasswordGeneratorModal(targetInputId) {
+        passwordGeneratorTargetInputId = targetInputId;
+        const modal = new bootstrap.Modal(document.getElementById('passwordGeneratorModal'));
+        const length = 16;
+        byId('passwordLength').value = length;
+        byId('passwordLengthValue').textContent = length;
+        byId('includeUppercase').checked = true;
+        byId('includeLowercase').checked = true;
+        byId('includeNumbers').checked = true;
+        byId('includeSymbols').checked = true;
+        regeneratePasswordInModal();
+        modal.show();
+    }
+
+    function regeneratePasswordInModal() {
+        const length = parseInt(byId('passwordLength').value, 10);
+        const includeUpper = byId('includeUppercase').checked;
+        const includeLower = byId('includeLowercase').checked;
+        const includeNumbers = byId('includeNumbers').checked;
+        const includeSymbols = byId('includeSymbols').checked;
+        
+        const password = generatePassword(length, includeUpper, includeLower, includeNumbers, includeSymbols);
+        byId('generatedPassword').value = password;
+        
+        const strength = calculatePasswordStrength(password);
+        const bar = byId('passwordStrengthBar');
+        bar.style.width = strength.score + '%';
+        bar.style.backgroundColor = strength.color;
+        bar.textContent = strength.text;
+        byId('passwordStrengthText').textContent = strength.text;
+    }
+
 
     function openAddModal(entityType) {
         const modal = new bootstrap.Modal(document.getElementById('addModal'));
@@ -281,7 +377,9 @@ document.addEventListener('DOMContentLoaded', () => {
             extra.innerHTML = `
                 <div class="mb-3">
                     <label for="addGroup" class="form-label">Group</label>
-                    <input type="text" class="form-control" id="addGroup" placeholder="e.g. Banking">
+                    <select class="form-select" id="addGroup">
+                        <option value="">Default</option>
+                    </select>
                 </div>
                 <div class="mb-3">
                     <label for="addAddress" class="form-label">Address</label>
@@ -293,8 +391,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="mb-3">
                     <label for="addValue" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="addValue" required>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="addValue" required>
+                        <button class="btn btn-outline-secondary" type="button" id="togglePasswordVisibility">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-primary" type="button" id="generatePasswordBtn">Generate</button>
+                    </div>
                 </div>`;
+            loadGroupsIntoSelect();
+            setTimeout(() => {
+                const toggleBtn = document.getElementById('togglePasswordVisibility');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', () => {
+                        const pwdInput = document.getElementById('addValue');
+                        const icon = toggleBtn.querySelector('i');
+                        if (pwdInput.type === 'password') {
+                            pwdInput.type = 'text';
+                            icon.className = 'bi bi-eye-slash';
+                        } else {
+                            pwdInput.type = 'password';
+                            icon.className = 'bi bi-eye';
+                        }
+                    });
+                }
+                const genBtn = document.getElementById('generatePasswordBtn');
+                if (genBtn) {
+                    genBtn.addEventListener('click', () => openPasswordGeneratorModal('addValue'));
+                }
+            }, 0);
         } else if (entityType === 'file') {
             document.querySelector("label[for='addName']").textContent = 'File name (optional)';
             extra.innerHTML = `
@@ -319,7 +444,9 @@ document.addEventListener('DOMContentLoaded', () => {
         extra.innerHTML = `
             <div class="mb-3">
                 <label for="addGroup" class="form-label">Group</label>
-                <input type="text" class="form-control" id="addGroup" placeholder="e.g. Banking" value="${item.group_name || ''}">
+                <select class="form-select" id="addGroup">
+                    <option value="">Default</option>
+                </select>
             </div>
             <div class="mb-3">
                 <label for="addAddress" class="form-label">Address</label>
@@ -331,8 +458,35 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="mb-3">
                 <label for="addValue" class="form-label">Password</label>
-                <input type="password" class="form-control" id="addValue" value="${item.password || ''}" required>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="addValue" value="${item.password || ''}" required>
+                    <button class="btn btn-outline-secondary" type="button" id="togglePasswordVisibility">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-primary" type="button" id="generatePasswordBtn">Generate</button>
+                </div>
             </div>`;
+        loadGroupsIntoSelect(item.group_name);
+        setTimeout(() => {
+            const toggleBtn = document.getElementById('togglePasswordVisibility');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => {
+                    const pwdInput = document.getElementById('addValue');
+                    const icon = toggleBtn.querySelector('i');
+                    if (pwdInput.type === 'password') {
+                        pwdInput.type = 'text';
+                        icon.className = 'bi bi-eye-slash';
+                    } else {
+                        pwdInput.type = 'password';
+                        icon.className = 'bi bi-eye';
+                    }
+                });
+            }
+            const genBtn = document.getElementById('generatePasswordBtn');
+            if (genBtn) {
+                genBtn.addEventListener('click', () => openPasswordGeneratorModal('addValue'));
+            }
+        }, 0);
         modal.show();
     }
 
@@ -368,16 +522,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setupTabs();
 
-    // Quick actions from Home tab
     document.querySelectorAll('.quick-action').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const tab = e.currentTarget.dataset.tab;
             if (tab === 'passwords') {
-                // Switch to passwords tab and open add modal
                 document.querySelector('a[href="#passwords"]').click();
                 setTimeout(() => openAddModal('password'), 100);
             } else if (tab === 'files') {
-                // Switch to files tab and trigger add file
                 document.querySelector('a[href="#files"]').click();
                 setTimeout(async () => {
                     const res = await window.api.addFileToVault();
@@ -409,9 +560,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('passwords-body').addEventListener('click', async (e) => {
+        const toggleBtn = e.target.closest('.toggle-password-visibility');
+        const copyBtn = e.target.closest('.copy-password');
         const editBtn = e.target.closest('.edit-password');
         const delBtn = e.target.closest('.delete-password');
-        if (editBtn) {
+        
+        if (toggleBtn) {
+            const cell = toggleBtn.closest('.cell-password');
+            const hiddenSpan = cell.querySelector('.password-hidden');
+            const visibleSpan = cell.querySelector('.password-visible');
+            const icon = toggleBtn.querySelector('i');
+            
+            if (hiddenSpan.style.display === 'none') {
+                hiddenSpan.style.display = '';
+                visibleSpan.style.display = 'none';
+                icon.className = 'bi bi-eye';
+            } else {
+                hiddenSpan.style.display = 'none';
+                visibleSpan.style.display = '';
+                icon.className = 'bi bi-eye-slash';
+            }
+        } else if (copyBtn) {
+            const password = copyBtn.dataset.password;
+            if (password) {
+                navigator.clipboard.writeText(password).then(() => {
+                    alert('Password copied to clipboard!');
+                }).catch(err => {
+                    alert('Failed to copy: ' + err);
+                });
+            }
+        } else if (editBtn) {
             const id = Number(editBtn.dataset.id);
             const item = passwordItems.get(id);
             if (item) openEditPasswordModal(item);
@@ -792,6 +970,40 @@ document.addEventListener('DOMContentLoaded', () => {
             sortState[tabId] = { key, dir: nextDir };
             loadData(tabId, true);
         });
+    });
+
+    byId('passwordLength')?.addEventListener('input', (e) => {
+        byId('passwordLengthValue').textContent = e.target.value;
+        regeneratePasswordInModal();
+    });
+
+    byId('includeUppercase')?.addEventListener('change', regeneratePasswordInModal);
+    byId('includeLowercase')?.addEventListener('change', regeneratePasswordInModal);
+    byId('includeNumbers')?.addEventListener('change', regeneratePasswordInModal);
+    byId('includeSymbols')?.addEventListener('change', regeneratePasswordInModal);
+
+    byId('regeneratePassword')?.addEventListener('click', regeneratePasswordInModal);
+
+    byId('copyGeneratedPassword')?.addEventListener('click', () => {
+        const pwd = byId('generatedPassword').value;
+        if (pwd) {
+            navigator.clipboard.writeText(pwd).then(() => {
+                alert('Password copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+    });
+
+    byId('useGeneratedPassword')?.addEventListener('click', () => {
+        const pwd = byId('generatedPassword').value;
+        if (pwd && passwordGeneratorTargetInputId) {
+            const targetInput = document.getElementById(passwordGeneratorTargetInputId);
+            if (targetInput) {
+                targetInput.value = pwd;
+            }
+        }
+        bootstrap.Modal.getInstance(document.getElementById('passwordGeneratorModal'))?.hide();
     });
 
     loadVaultName();

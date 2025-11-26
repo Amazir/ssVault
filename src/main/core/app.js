@@ -5,7 +5,7 @@ function createWindow() {
     const mainWindow = new BrowserWindow({
         width: 1270,
         height: 720,
-        show: false, // show after ready-to-show to avoid initial UI freeze
+        show: false,
         backgroundColor: '#1e1e1e',
         resizable: false,
         webPreferences: {
@@ -18,14 +18,10 @@ function createWindow() {
     });
 
     mainWindow.loadFile(path.join(__dirname, '../../renderer/pages/vaults.html'));
-    // Open DevTools for debugging
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    if (process.env.NODE_ENV === 'development') {
+        mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
     return mainWindow;
 }
-
-/*
-
-TODO: ogarnac grupy do haseł, ogarnac sortowanie, ogarnac wielkosc GUI pierwszego okna, ogarnac kod czytelnosc
- */
 
 module.exports = { createWindow };

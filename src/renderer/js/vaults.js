@@ -1,18 +1,13 @@
-// Get vaults from main process and insert into table
 async function loadVaults() {
     if (!window.api || typeof window.api.getVaults !== 'function') {
         console.error('API getVaults not available');
         return;
     }
-
-    // Get vaults from server
     const vaults = await window.api.getVaults();
     
-    // Get vault list object from html and clear it
     const list = document.getElementById('vaultList');
     list.innerHTML = '';
     
-    // Add table rows with functionality for ever vault user have imported
     vaults.forEach(v => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -26,20 +21,15 @@ async function loadVaults() {
     });
 }
 
-// Create new vault form
 document.getElementById('createSubmit').addEventListener('click', async () => {
     
-    // Get name and password values from HTML
     const name = document.getElementById('vaultName').value;
     const password = document.getElementById('vaultPassword').value;
     
-    // Check if name and password are provided
     if (name && password) {
         
-        // Try to create vault (init authentication)
         const response = await window.api.createVault({ name, password });
         
-        // If password matches the vault, if not throw error
         if (response.success) {
             bootstrap.Modal.getInstance(document.getElementById('createModal')).hide();
             loadVaults();
@@ -49,24 +39,19 @@ document.getElementById('createSubmit').addEventListener('click', async () => {
 });
 
 
-// Import vault
 document.getElementById('importBtn').addEventListener('click', async () => {
     const response = await window.api.importVault();
     if (response.success) loadVaults();
 });
 
-// Open vault
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('openBtn')) {
         
-        // Get vault path
         const path = e.target.dataset.path;
         
-        // Create and show modal from Bootstrap
         const openModal = new bootstrap.Modal(document.getElementById('openModal'));
         openModal.show();
 
-        // Create hidden input with vault path
         let pathInput = document.getElementById('openPath');
         if (!pathInput) {
             pathInput = document.createElement('input');
@@ -76,7 +61,6 @@ document.addEventListener('click', (e) => {
         }
         pathInput.value = path;
 
-        // Handle form submit (enter key)
         const form = document.getElementById('openForm');
         const formHandler = (e) => {
             e.preventDefault();
@@ -84,38 +68,170 @@ document.addEventListener('click', (e) => {
         };
         form.addEventListener('submit', formHandler);
 
-        // Get submit button from html and init handler for submit
         const submitBtn = document.getElementById('openSubmit');
         const submitHandler = async () => {
             
-            // Get vaults password and path
             const password = document.getElementById('openPassword').value;
             const path = document.getElementById('openPath').value;
             
-            // If user provided password
             if (password) {
                 
-                // Authenticate 
                 const response = await window.api.openVault({ vaultPath: path, password });
                 
-                // If auth is successfull then open dashboard, else throw the error
                 if (response.success)
                     window.api.loadDashboard();
                 else 
                     alert(response.error);
             }
             
-            // Hide vault opener modal
             openModal.hide();
             
-            // Clean up event listeners
             submitBtn.removeEventListener('click', submitHandler);
             form.removeEventListener('submit', formHandler);
         };
         submitBtn.addEventListener('click', submitHandler);
     } else if (e.target.classList.contains('removeBtn')) {
-        // TODO: Handling removing vaults
     }
 });
 
 loadVaults();
+function generatePassword(length, includeUpper, includeLower, includeNumbers, includeSymbols) {
+    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lower = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    
+    let charset = '';
+    if (includeUpper) charset += upper;
+    if (includeLower) charset += lower;
+    if (includeNumbers) charset += numbers;
+    if (includeSymbols) charset += symbols;
+    
+    if (!charset) return '';
+    
+    let password = '';
+    const array = new Uint32Array(length);
+    crypto.getRandomValues(array);
+    for (let i = 0; i < length; i++) {
+        password += charset[array[i] % charset.length];
+    }
+    return password;
+}
+
+function calculatePasswordStrength(password) {
+    let score = 0;
+    if (!password) return { score: 0, text: 'No password', color: '#dc3545' };
+    
+    if (password.length >= 8) score += 20;
+    if (password.length >= 12) score += 20;
+    if (password.length >= 16) score += 10;
+    if (/[a-z]/.test(password)) score += 10;
+    if (/[A-Z]/.test(password)) score += 10;
+    if (/[0-9]/.test(password)) score += 10;
+    if (/[^a-zA-Z0-9]/.test(password)) score += 20;
+    
+    if (score <= 30) return { score: 30, text: 'Weak', color: '#dc3545' };
+    if (score <= 60) return { score: 60, text: 'Medium', color: '#ffc107' };
+    if (score <= 80) return { score: 80, text: 'Strong', color: '#28a745' };
+    return { score: 100, text: 'Very Strong', color: '#28a745' };
+}
+
+function regeneratePasswordInModal() {
+    const length = parseInt(document.getElementById('passwordLength').value, 10);
+    const includeUpper = document.getElementById('includeUppercase').checked;
+    const includeLower = document.getElementById('includeLowercase').checked;
+    const includeNumbers = document.getElementById('includeNumbers').checked;
+    const includeSymbols = document.getElementById('includeSymbols').checked;
+    
+    const password = generatePassword(length, includeUpper, includeLower, includeNumbers, includeSymbols);
+    document.getElementById('generatedPassword').value = password;
+    
+    const strength = calculatePasswordStrength(password);
+    const bar = document.getElementById('passwordStrengthBar');
+    bar.style.width = strength.score + '%';
+    bar.style.backgroundColor = strength.color;
+    bar.textContent = strength.text;
+    document.getElementById('passwordStrengthText').textContent = strength.text;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const toggleVaultPasswordBtn = document.getElementById('toggleVaultPassword');
+    if (toggleVaultPasswordBtn) {
+        toggleVaultPasswordBtn.addEventListener('click', () => {
+            const pwdInput = document.getElementById('vaultPassword');
+            const icon = toggleVaultPasswordBtn.querySelector('i');
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                pwdInput.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        });
+    }
+
+    const toggleOpenPasswordBtn = document.getElementById('toggleOpenPassword');
+    if (toggleOpenPasswordBtn) {
+        toggleOpenPasswordBtn.addEventListener('click', () => {
+            const pwdInput = document.getElementById('openPassword');
+            const icon = toggleOpenPasswordBtn.querySelector('i');
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                pwdInput.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        });
+    }
+
+    const generateVaultPasswordBtn = document.getElementById('generateVaultPassword');
+    if (generateVaultPasswordBtn) {
+        generateVaultPasswordBtn.addEventListener('click', () => {
+            const modal = new bootstrap.Modal(document.getElementById('passwordGeneratorModal'));
+            const length = 16;
+            document.getElementById('passwordLength').value = length;
+            document.getElementById('passwordLengthValue').textContent = length;
+            document.getElementById('includeUppercase').checked = true;
+            document.getElementById('includeLowercase').checked = true;
+            document.getElementById('includeNumbers').checked = true;
+            document.getElementById('includeSymbols').checked = true;
+            regeneratePasswordInModal();
+            modal.show();
+        });
+    }
+
+    document.getElementById('passwordLength')?.addEventListener('input', (e) => {
+        document.getElementById('passwordLengthValue').textContent = e.target.value;
+        regeneratePasswordInModal();
+    });
+
+    document.getElementById('includeUppercase')?.addEventListener('change', regeneratePasswordInModal);
+    document.getElementById('includeLowercase')?.addEventListener('change', regeneratePasswordInModal);
+    document.getElementById('includeNumbers')?.addEventListener('change', regeneratePasswordInModal);
+    document.getElementById('includeSymbols')?.addEventListener('change', regeneratePasswordInModal);
+
+    document.getElementById('regeneratePassword')?.addEventListener('click', regeneratePasswordInModal);
+
+    document.getElementById('copyGeneratedPassword')?.addEventListener('click', () => {
+        const pwd = document.getElementById('generatedPassword').value;
+        if (pwd) {
+            navigator.clipboard.writeText(pwd).then(() => {
+                alert('Password copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+    });
+
+    document.getElementById('useGeneratedPassword')?.addEventListener('click', () => {
+        const pwd = document.getElementById('generatedPassword').value;
+        if (pwd) {
+            const targetInput = document.getElementById('vaultPassword');
+            if (targetInput) {
+                targetInput.value = pwd;
+            }
+        }
+        bootstrap.Modal.getInstance(document.getElementById('passwordGeneratorModal'))?.hide();
+    });
+});

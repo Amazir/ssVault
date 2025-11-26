@@ -135,6 +135,11 @@ async function ensureBaseTables(db = getCurrentDB()) {
     await run(db, "CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, name TEXT, path TEXT)");
     await run(db, "CREATE TABLE IF NOT EXISTS gpg (id INTEGER PRIMARY KEY, name TEXT, type TEXT)");
     await run(db, "CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT UNIQUE)");
+    await run(db, "CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, last_attempt_time INTEGER, failed_count INTEGER DEFAULT 0, locked_until INTEGER DEFAULT 0)");
+    
+    await run(db, "INSERT OR IGNORE INTO groups (id, name) VALUES (1, 'Default')");
+    
+    await run(db, "INSERT OR IGNORE INTO login_attempts (id, failed_count) VALUES (1, 0)");
 }
 
 async function ensurePasswordColumns(db = getCurrentDB()) {
@@ -142,12 +147,26 @@ async function ensurePasswordColumns(db = getCurrentDB()) {
     const have = (n) => cols.some(c => c.name === n);
     const alters = [];
     if (!have('label')) alters.push('ALTER TABLE passwords ADD COLUMN label TEXT');
-    if (!have('group_name')) alters.push('ALTER TABLE passwords ADD COLUMN group_name TEXT');
-    if (!have('group_id')) alters.push('ALTER TABLE passwords ADD COLUMN group_id INTEGER');
+    
+    if (!have('group_id')) alters.push('ALTER TABLE passwords ADD COLUMN group_id INTEGER DEFAULT 1');
     if (!have('address')) alters.push('ALTER TABLE passwords ADD COLUMN address TEXT');
     if (!have('username')) alters.push('ALTER TABLE passwords ADD COLUMN username TEXT');
     for (const sql of alters) {
         await run(db, sql);
+    }
+    
+    
+    if (have('group_name')) {
+        console.log('Migrating passwords with group_name to group_id...');
+        const passwordsWithGroupName = await all(db, 'SELECT id, group_name FROM passwords WHERE group_name IS NOT NULL AND group_id IS NULL');
+        for (const pwd of passwordsWithGroupName) {
+            const groupId = await ensureGroupByName(pwd.group_name, db);
+            if (groupId) {
+                await run(db, 'UPDATE passwords SET group_id = ? WHERE id = ?', [groupId, pwd.id]);
+            }
+        }
+        
+        await run(db, 'UPDATE passwords SET group_id = 1 WHERE group_id IS NULL');
     }
 }
 
@@ -160,6 +179,22 @@ async function ensureGpgColumns(db = getCurrentDB()) {
     if (!have('user_id')) {
         await run(db, 'ALTER TABLE gpg ADD COLUMN user_id TEXT');
     }
+}
+
+async function ensureAuthColumns(db = getCurrentDB()) {
+    const cols = await all(db, 'PRAGMA table_info(auth)');
+    const have = (n) => cols.some(c => c.name === n);
+    const alters = [];
+    if (!have('vault_public_key')) alters.push('ALTER TABLE auth ADD COLUMN vault_public_key TEXT');
+    if (!have('vault_private_key')) alters.push('ALTER TABLE auth ADD COLUMN vault_private_key TEXT');
+    for (const sql of alters) {
+        await run(db, sql);
+    }
+}
+
+async function ensureLoginAttemptsTable(db = getCurrentDB()) {
+    await run(db, 'CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, last_attempt_time INTEGER, failed_count INTEGER DEFAULT 0, locked_until INTEGER DEFAULT 0)');
+    await run(db, 'INSERT OR IGNORE INTO login_attempts (id, failed_count) VALUES (1, 0)');
 }
 
 async function checkpoint(db = getCurrentDB()) {
@@ -182,7 +217,12 @@ async function ensureGroupByName(name, db = getCurrentDB()) {
 async function getPasswords(db = getCurrentDB()) {
     await ensureBaseTables(db);
     await ensurePasswordColumns(db);
-    return all(db, `SELECT p.id, COALESCE(p.label, p.name) AS label, COALESCE(g.name, p.group_name) AS group_name, p.address, p.username, p.password
+    return all(db, `SELECT p.id,
+                           COALESCE(p.label, p.name) AS label,
+                           COALESCE(g.name, 'Default') AS group_name,
+                           p.address,
+                           p.username,
+                           p.password
                     FROM passwords p
                     LEFT JOIN groups g ON g.id = p.group_id
                     ORDER BY p.id DESC`);
@@ -213,9 +253,10 @@ async function addPassword(payload, db = getCurrentDB()) {
     await ensureBaseTables(db);
     await ensurePasswordColumns(db);
     const { label, group, address, username, password } = payload;
-    const groupId = group ? await ensureGroupByName(group, db) : null;
-    const res = await run(db, 'INSERT INTO passwords (name, label, group_name, group_id, address, username, password) VALUES (?,?,?,?,?,?,?)', [
-        label, label, group || null, groupId, address || null, username || null, password
+    
+    const groupId = group ? await ensureGroupByName(group, db) : 1;
+    const res = await run(db, 'INSERT INTO passwords (name, label, group_id, address, username, password) VALUES (?,?,?,?,?,?)', [
+        label, label, groupId, address || null, username || null, password
     ]);
     return { id: res && res.lastID };
 }
@@ -227,8 +268,8 @@ async function updatePassword(payload, db = getCurrentDB()) {
     const params = [];
     if (payload.label != null) { fields.push('label = ?'); params.push(payload.label); }
     if (payload.group != null) {
-        fields.push('group_name = ?'); params.push(payload.group);
-        const groupId = payload.group ? await ensureGroupByName(payload.group, db) : null;
+        
+        const groupId = payload.group ? await ensureGroupByName(payload.group, db) : 1;
         fields.push('group_id = ?'); params.push(groupId);
     }
     if (payload.address != null) { fields.push('address = ?'); params.push(payload.address); }
@@ -276,6 +317,12 @@ async function addGroup(name, db = getCurrentDB()) {
 
 async function deleteGroup(id, db = getCurrentDB()) {
     await ensureBaseTables(db);
+    // Prevent deletion of Default group (id=1)
+    if (id === 1 || id === '1') {
+        throw new Error('Cannot delete the Default group');
+    }
+    // Move passwords from deleted group to Default
+    await run(db, 'UPDATE passwords SET group_id = 1 WHERE group_id = ?', [id]);
     const res = await run(db, 'DELETE FROM groups WHERE id = ?', [id]);
     return { changes: res && res.changes };
 }
@@ -292,4 +339,33 @@ async function getGpgById(id, db = getCurrentDB()) {
     return get(db, 'SELECT * FROM gpg WHERE id = ?', [id]);
 }
 
-module.exports = { openVaultDB, getCurrentDB, closeCurrentDB, run, get, all, ensureBaseTables, ensurePasswordColumns, ensureGpgColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, deleteGpg, getGpgById, getGroups, addGroup, deleteGroup };
+module.exports = {
+    openVaultDB,
+    getCurrentDB,
+    closeCurrentDB,
+    run,
+    get,
+    all,
+    ensureBaseTables,
+    ensurePasswordColumns,
+    ensureGpgColumns,
+    ensureAuthColumns,
+    ensureLoginAttemptsTable,
+    checkpoint,
+    optimize,
+    ensureGroupByName,
+    getPasswords,
+    getFiles,
+    getGpg,
+    getCounts,
+    addPassword,
+    updatePassword,
+    deletePassword,
+    addFile,
+    addGpg,
+    deleteGpg,
+    getGpgById,
+    getGroups,
+    addGroup,
+    deleteGroup
+};
