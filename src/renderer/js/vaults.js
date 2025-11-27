@@ -188,7 +188,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateVaultPasswordBtn = document.getElementById('generateVaultPassword');
     if (generateVaultPasswordBtn) {
         generateVaultPasswordBtn.addEventListener('click', () => {
-            const modal = new bootstrap.Modal(document.getElementById('passwordGeneratorModal'));
+            const modalEl = document.getElementById('passwordGeneratorModal');
+            if (!modalEl) {
+                console.error('Password generator modal not found');
+                return;
+            }
+            const modal = new bootstrap.Modal(modalEl);
             const length = 16;
             document.getElementById('passwordLength').value = length;
             document.getElementById('passwordLengthValue').textContent = length;

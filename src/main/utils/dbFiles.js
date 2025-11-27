@@ -1,8 +1,5 @@
 const { getCurrentDB, run, get, all, ensureBaseTables } = require('./db');
 
-/**
- * Ensure the files table has all required columns for enhanced file storage
- */
 async function ensureFileColumns(db = getCurrentDB()) {
     try {
         const cols = await all(db, 'PRAGMA table_info(files)');
@@ -11,7 +8,7 @@ async function ensureFileColumns(db = getCurrentDB()) {
         
         console.log('Current files table columns:', cols.map(c => c.name));
         
-        // Migrate from old structure if needed
+        
         if (have('path') && !have('original_name')) {
             console.log('Migrating files table from old structure...');
         }
@@ -34,46 +31,39 @@ async function ensureFileColumns(db = getCurrentDB()) {
     }
 }
 
-/**
- * Determine high-level file type from name or stored filename.
- * Categories kept intentionally szerokie do sortowania/filtrów w UI.
- */
 function mapFileType(filename = '') {
     const lower = filename.toLowerCase();
 
-    // Images
+    
     if (/\.(png|jpe?g|gif|webp|bmp|tiff?|svg|heic|heif|ico)$/.test(lower)) return 'Image';
 
-    // Video
+    
     if (/\.(mp4|m4v|mkv|mov|avi|wmv|flv|webm|mpeg|mpg|3gp)$/.test(lower)) return 'Video';
 
-    // Audio
+    
     if (/\.(mp3|wav|flac|aac|ogg|m4a|wma|opus)$/.test(lower)) return 'Audio';
 
-    // Archives / packages
+    
     if (/\.(zip|rar|7z|tar|gz|bz2|xz|tgz|iso|dmg)$/.test(lower)) return 'Archive';
 
-    // Documents / text-like
+    
     if (/\.(txt|md|rtf|log)$/.test(lower)) return 'Text';
     if (/\.(pdf)$/.test(lower)) return 'PDF';
     if (/\.(docx?|odt|rtf)$/.test(lower)) return 'Document';
     if (/\.(xlsx?|ods|csv|tsv)$/.test(lower)) return 'Spreadsheet';
     if (/\.(pptx?|odp)$/.test(lower)) return 'Presentation';
 
-    // Code / config
+    
     if (/\.(js|ts|jsx|tsx|java|c|cpp|cs|go|rs|py|php|rb|swift|kt|sql|html|css|json|yml|yaml|xml|ini|cfg|env)$/.test(lower)) {
         return 'Code/Config';
     }
 
-    // Data / binaries
+    
     if (/\.(db|sqlite|sqlite3|bak|bin|dat)$/.test(lower)) return 'Data';
 
     return 'Other';
 }
 
-/**
- * Get all files with enhanced metadata + computed type (bez zmian w schemacie).
- */
 async function getFiles(db = getCurrentDB()) {
     await ensureBaseTables(db);
     await ensureFileColumns(db);
@@ -82,7 +72,7 @@ async function getFiles(db = getCurrentDB()) {
     const have = (n) => cols.some(c => c.name === n);
     
     if (have('original_name')) {
-        // New structure
+        
         const rows = await all(db, `SELECT id,
                                            COALESCE(name, original_name) as name,
                                            original_name,
@@ -91,13 +81,13 @@ async function getFiles(db = getCurrentDB()) {
                                            stored_filename,
                                            added_date
                                     FROM files ORDER BY id DESC`);
-        // Dodaj pole type dynamicznie po stronie serwera
+        
         return rows.map(row => ({
             ...row,
             type: mapFileType(row.original_name || row.name || row.stored_filename)
         }));
     } else {
-        // Fallback for old structure (should not happen after migration)
+        
         const rows = await all(db, `SELECT id, name, path as stored_filename FROM files ORDER BY id DESC`);
         return rows.map(row => ({
             ...row,
@@ -106,9 +96,6 @@ async function getFiles(db = getCurrentDB()) {
     }
 }
 
-/**
- * Add a file with enhanced metadata
- */
 async function addFile(payload, db = getCurrentDB()) {
     await ensureBaseTables(db);
     await ensureFileColumns(db);
@@ -130,9 +117,6 @@ async function addFile(payload, db = getCurrentDB()) {
     }
 }
 
-/**
- * Update file metadata
- */
 async function updateFile(id, payload, db = getCurrentDB()) {
     await ensureBaseTables(db);
     await ensureFileColumns(db);
@@ -153,36 +137,24 @@ async function updateFile(id, payload, db = getCurrentDB()) {
     return { changes: res && res.changes };
 }
 
-/**
- * Delete a file record from database
- */
 async function deleteFile(id, db = getCurrentDB()) {
     await ensureBaseTables(db);
     const res = await run(db, 'DELETE FROM files WHERE id = ?', [id]);
     return { changes: res && res.changes };
 }
 
-/**
- * Get file by ID
- */
 async function getFileById(id, db = getCurrentDB()) {
     await ensureBaseTables(db);
     await ensureFileColumns(db);
     return get(db, 'SELECT * FROM files WHERE id = ?', [id]);
 }
 
-/**
- * Get file by stored filename
- */
 async function getFileByStoredFilename(storedFilename, db = getCurrentDB()) {
     await ensureBaseTables(db);
     await ensureFileColumns(db);
     return get(db, 'SELECT * FROM files WHERE stored_filename = ?', [storedFilename]);
 }
 
-/**
- * Get files count
- */
 async function getFilesCount(db = getCurrentDB()) {
     await ensureBaseTables(db);
     const result = await get(db, 'SELECT COUNT(*) AS c FROM files');

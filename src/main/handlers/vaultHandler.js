@@ -22,7 +22,7 @@ class VaultHandler {
         this.tempDir = path.join(os.tmpdir(), 'ssVault-temp');
         this.cleanTempDir();
         if (!fs.existsSync(this.tempDir)) fs.mkdirSync(this.tempDir, { recursive: true });
-        this.fileManager = null; // Will be initialized after loading vault GPG keys
+        this.fileManager = null;
         this.vaultPublicKey = null;
         this.vaultPrivateKey = null;
     }
@@ -35,7 +35,6 @@ class VaultHandler {
         const zip = new AdmZip();
         zip.addLocalFile(dbPath);
         
-        // Add all files from the files directory
         const filesDir = path.join(this.tempDir, 'files');
         if (fs.existsSync(filesDir)) {
             const files = this.fileManager.getAllVaultFiles();
@@ -66,9 +65,7 @@ class VaultHandler {
         }
     }
 
-    /**
-     * Generate GPG keypair for vault and store in database
-     */
+    
     async generateVaultKeyPair(db) {
         console.log('Generating vault GPG keypair...');
         const keyPair = await generateGpgKeyPair({
@@ -77,13 +74,13 @@ class VaultHandler {
             expirationDays: 0
         });
         
-        // Encrypt private key with vault password
+        
         const encryptedPrivateKey = await encryptPrivateKey(
             keyPair.privateKeyArmored,
             this.password
         );
         
-        // Store in auth table
+        
         await new Promise((resolve, reject) => {
             db.run(`UPDATE auth SET vault_public_key = ?, vault_private_key = ? WHERE id = 1`,
                 [keyPair.publicKeyArmored, encryptedPrivateKey],
@@ -96,7 +93,7 @@ class VaultHandler {
         });
         
         this.vaultPublicKey = keyPair.publicKeyArmored;
-        this.vaultPrivateKey = keyPair.privateKeyArmored; // Store decrypted version
+        this.vaultPrivateKey = keyPair.privateKeyArmored; 
         
         return keyPair;
     }
@@ -107,16 +104,14 @@ class VaultHandler {
             if (!fs.existsSync(dbPath)) throw new Error('DB not created');
             console.log('DB exists:', dbPath);
             
-            // Initialize FileManager with public key
             this.fileManager = new FileManager(this.tempDir, this.vaultPublicKey);
             
-            // Create files directory in temp
             this.fileManager.ensureFilesDirectory();
             
             const zip = new AdmZip();
             zip.addLocalFile(dbPath);
             
-            // Add empty files directory structure
+            
             const filesDir = path.join(this.tempDir, 'files');
             if (fs.existsSync(filesDir)) {
                 zip.addLocalFolder(filesDir, 'files');
@@ -149,7 +144,7 @@ class VaultHandler {
                     db.run('PRAGMA synchronous = FULL', (syncErr) => {
                         if (syncErr) return reject(syncErr);
                         console.log('Synchronous FULL');
-                        // Create auth table with GPG key columns
+                        
                         db.run('CREATE TABLE IF NOT EXISTS auth (id INTEGER PRIMARY KEY, master_hash TEXT, vault_public_key TEXT, vault_private_key TEXT)', (err) => {
                             if (err) return reject(err);
                             console.log('Table auth created');
@@ -158,7 +153,7 @@ class VaultHandler {
                                 if (err) return reject(err);
                                 console.log('Hash inserted');
                                 
-                                // Generate and store vault GPG keypair
+                                
                                 try {
                                     await this.generateVaultKeyPair(db);
                                 } catch (keyErr) {
@@ -168,12 +163,12 @@ class VaultHandler {
                                     if (err) return reject(err);
                                     console.log('Table passwords created');
                                     
-                                    // Create files table with enhanced structure
+                                    
                                     db.run('CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, name TEXT, original_name TEXT, size INTEGER, hash TEXT, stored_filename TEXT, added_date TEXT)', (filesErr) => {
                                         if (filesErr) return reject(filesErr);
                                         console.log('Table files created');
                                         
-                                        // Create other tables
+                                        
                                         db.run('CREATE TABLE IF NOT EXISTS gpg (id INTEGER PRIMARY KEY, name TEXT, type TEXT)', (gpgErr) => {
                                             if (gpgErr) return reject(gpgErr);
                                             console.log('Table gpg created');
@@ -182,12 +177,12 @@ class VaultHandler {
                                                 if (groupsErr) return reject(groupsErr);
                                                 console.log('Table groups created');
                                                 
-                                                // Insert default group that cannot be deleted
+                                                
                                                 db.run('INSERT OR IGNORE INTO groups (id, name) VALUES (1, ?)', ['Default'], (defaultGroupErr) => {
                                                     if (defaultGroupErr) return reject(defaultGroupErr);
                                                     console.log('Default group created');
                                                     
-                                                    // Create login_attempts table
+                                                    
                                                     db.run('CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, last_attempt_time INTEGER, failed_count INTEGER DEFAULT 0, locked_until INTEGER DEFAULT 0)', (loginAttemptsErr) => {
                                                         if (loginAttemptsErr) return reject(loginAttemptsErr);
                                                         console.log('Table login_attempts created');
@@ -225,7 +220,7 @@ class VaultHandler {
 
     async openVault() {
         try {
-            const encryptedData = fs.readFileSync(this.vaultPath); // Buffer
+            const encryptedData = fs.readFileSync(this.vaultPath); 
             const decryptedZipBuffer = await this.decryptWithGPG(encryptedData);
 
             const zip = new AdmZip(decryptedZipBuffer);
@@ -238,10 +233,10 @@ class VaultHandler {
             await openVaultDB(dbPath, this.password);
             console.log('DB opened from vault');
             
-            // Load vault GPG keys from database
+            
             await this.loadVaultKeys();
             
-            // Initialize FileManager with loaded keys
+            
             this.fileManager = new FileManager(this.tempDir, this.vaultPublicKey, this.vaultPrivateKey, this.password);
         } catch (err) {
             console.error('openVault error:', err);
@@ -250,9 +245,7 @@ class VaultHandler {
         }
     }
     
-    /**
-     * Load vault GPG keys from database
-     */
+    
     async loadVaultKeys() {
         const { get } = require('../utils/db');
         const { getCurrentDB } = require('../utils/db');
@@ -266,7 +259,7 @@ class VaultHandler {
         
         this.vaultPublicKey = authRow.vault_public_key;
         
-        // Decrypt private key with vault password
+        
         this.vaultPrivateKey = await decryptPrivateKey(
             authRow.vault_private_key,
             this.password
@@ -288,7 +281,6 @@ class VaultHandler {
         const zip = new AdmZip();
         zip.addLocalFile(dbPath);
         
-        // Add all files from the files directory
         const filesDir = path.join(this.tempDir, 'files');
         if (fs.existsSync(filesDir)) {
             const files = this.fileManager.getAllVaultFiles();
@@ -313,9 +305,9 @@ class VaultHandler {
         const encrypted = await openpgp.encrypt({
             message,
             passwords: [this.password],
-            format: 'binary', // binary
+            format: 'binary', 
         });
-        return Buffer.from(encrypted); // return Buffer
+        return Buffer.from(encrypted); 
     }
 
     async decryptWithGPG(encryptedBuffer) {
@@ -323,7 +315,7 @@ class VaultHandler {
         const { data } = await openpgp.decrypt({
             message,
             passwords: [this.password],
-            format: 'binary', // Uint8Array
+            format: 'binary', 
         });
         return Buffer.from(data);
     }

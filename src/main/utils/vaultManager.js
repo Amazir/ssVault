@@ -28,13 +28,13 @@ class VaultManager {
             try {
                 const keyData = fs.readFileSync(keyPath);
                 
-                // Check if it's encrypted (safeStorage format) or plain text
+                
                 if (safeStorage.isEncryptionAvailable()) {
                     try {
-                        // Try to decrypt - if this works, it's in new format
+                        
                         return safeStorage.decryptString(keyData);
                     } catch (decryptErr) {
-                        // Failed to decrypt - might be old unencrypted format
+                        
                         const plainKey = keyData.toString('utf8');
                         try {
                             const encryptedKey = safeStorage.encryptString(plainKey);
@@ -42,13 +42,13 @@ class VaultManager {
                             console.log('Migrated encryption key to safeStorage format');
                             return plainKey;
                         } catch (migrateErr) {
-                            // Migration failed, delete corrupted file and regenerate
+                            
                             console.error('Key migration failed, regenerating:', migrateErr);
                             fs.unlinkSync(keyPath);
                         }
                     }
                 } else {
-                    // safeStorage not available, use plain text
+                    
                     return keyData.toString('utf8');
                 }
             } catch (err) {
@@ -59,10 +59,10 @@ class VaultManager {
             }
         }
         
-        // Generate new key
+        
         const newKey = crypto.randomBytes(32).toString('hex');
         
-        // Save encrypted key using OS-level storage
+        
         if (safeStorage.isEncryptionAvailable()) {
             try {
                 const encryptedKey = safeStorage.encryptString(newKey);

@@ -317,11 +317,11 @@ async function addGroup(name, db = getCurrentDB()) {
 
 async function deleteGroup(id, db = getCurrentDB()) {
     await ensureBaseTables(db);
-    // Prevent deletion of Default group (id=1)
+    
     if (id === 1 || id === '1') {
         throw new Error('Cannot delete the Default group');
     }
-    // Move passwords from deleted group to Default
+    
     await run(db, 'UPDATE passwords SET group_id = 1 WHERE group_id = ?', [id]);
     const res = await run(db, 'DELETE FROM groups WHERE id = ?', [id]);
     return { changes: res && res.changes };

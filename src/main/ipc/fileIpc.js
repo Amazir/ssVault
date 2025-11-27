@@ -6,7 +6,7 @@ const { getFiles, addFile, deleteFile, getFileById, getFilesCount, ensureFileCol
 function registerFileIpcHandlers() {
     console.log('Registering file IPC handlers...');
     
-    // File operations
+    
     ipcMain.handle('add-file-to-vault', async () => {
         const handler = getCurrentSessionHandler();
         if (!handler) return { success: false, error: 'No open vault.' };
@@ -21,10 +21,10 @@ function registerFileIpcHandlers() {
             
             const { sourceFilePath, originalName, shouldMove } = fileSelection;
             
-            // Store the file physically
+            
             const fileData = await fileManager.storeFileInVault(sourceFilePath, originalName, shouldMove);
             
-            // Store metadata in database
+            
             const db = getCurrentDB();
             const res = await addFile({
                 name: originalName,
@@ -35,7 +35,7 @@ function registerFileIpcHandlers() {
                 addedDate: fileData.addedDate
             }, db);
             
-            // Auto-save vault
+            
             try { 
                 if (handler && handler.sealVault) {
                     await handler.sealVault();
@@ -92,14 +92,14 @@ function registerFileIpcHandlers() {
                 return { success: false, error: 'File not found.' };
             }
             
-            // Delete physical file
+            
             const fileManager = handler.fileManager;
             fileManager.deleteFileFromVault(fileRecord.stored_filename);
             
-            // Delete database record
+            
             const res = await deleteFile(fileId, db);
             
-            // Auto-save vault
+            
             try { 
                 if (handler && handler.sealVault) {
                     await handler.sealVault();

@@ -59,7 +59,7 @@ function registerVaultIpcHandlers(mainWindow) {
     ipcMain.handle('open-vault', async (event, { vaultPath, password }) => {
         let tempHandler = null;
         try {
-            // Step 1: Temporarily open vault to access login_attempts table
+            
             tempHandler = new VaultHandler(vaultPath, password);
             await tempHandler.openVault();
             
@@ -69,11 +69,11 @@ function registerVaultIpcHandlers(mainWindow) {
                 return { error: 'Database not accessible' };
             }
             
-            // Ensure tables exist (for old vaults without login_attempts)
+            
             await ensureAuthColumns(db);
             await ensureLoginAttemptsTable(db);
             
-            // Step 2: Check lockout status
+            
             const attemptsManager = new LoginAttemptsManager(db);
             const lockStatus = await attemptsManager.checkLockout();
             
@@ -85,11 +85,11 @@ function registerVaultIpcHandlers(mainWindow) {
                 };
             }
             
-            // Step 3: Validate password
+            
             const isValid = await validateMasterPasswordForVault(password);
             
             if (!isValid) {
-                // Record failed attempt
+                
                 const result = await attemptsManager.recordFailedAttempt();
                 await closeCurrentDB();
                 if (tempHandler) tempHandler.cleanTempDir();
@@ -105,10 +105,10 @@ function registerVaultIpcHandlers(mainWindow) {
                 };
             }
             
-            // Step 4: Success - reset attempts counter
+            
             await attemptsManager.resetAttempts();
             
-            // Step 5: Set session (handler already opened)
+            
             setCurrentSession(vaultPath, password, tempHandler);
             return { success: true };
             
@@ -312,18 +312,18 @@ function registerVaultIpcHandlers(mainWindow) {
                 email: payload.email || undefined,
                 expirationDays: payload.expirationDays || 0
             });
-            // Build user ID string (like in GPG: "Name <email>")
+            
             const userIdStr = payload.email
                 ? `${payload.userName} <${payload.email}>`
                 : payload.userName;
-            // Add private key
+            
             await addGpg({
                 name: `${payload.name} (Private)`,
                 type: 'private',
                 content: keys.privateKeyArmored,
                 userId: userIdStr
             }, db);
-            // Add public key
+            
             await addGpg({
                 name: `${payload.name} (Public)`,
                 type: 'public',

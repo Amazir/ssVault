@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Render
+        
         body.innerHTML = '';
 
         if (tabId === 'passwords') {
@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="mb-3">
                     <label for="addAddress" class="form-label">Address</label>
-                    <input type="text" class="form-control" id="addAddress" placeholder="https://... or App name">
+                    <input type="text" class="form-control" id="addAddress" placeholder="https:
                 </div>
                 <div class="mb-3">
                     <label for="addUsername" class="form-label">Username/E-Mail</label>
@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="mb-3">
                 <label for="addAddress" class="form-label">Address</label>
-                <input type="text" class="form-control" id="addAddress" placeholder="https://... or App name" value="${item.address || ''}">
+                <input type="text" class="form-control" id="addAddress" placeholder="https:
             </div>
             <div class="mb-3">
                 <label for="addUsername" class="form-label">Username/E-Mail</label>
@@ -501,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 document.querySelectorAll('#dashboardTabs .nav-link').forEach(l => l.classList.remove('active'));
 
-                // Don't highlight dropdown toggle when inside dropdown is selected
+                
                 const ddToggle = document.getElementById('passwordsDropdown');
                 if (target === '#passwords' || target === '#groups') {
                     if (ddToggle) ddToggle.classList.add('active');
@@ -538,7 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }, 100);
             } else if (tab === 'gpg') {
-                // Switch to GPG tab and open generate modal
+                
                 document.querySelector('a[href="#gpg"]').click();
                 setTimeout(() => {
                     const modal = new bootstrap.Modal(byId('generateGpgModal'));
@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('.add-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const entityType = e.currentTarget.dataset.type; // password | file | gpg
+            const entityType = e.currentTarget.dataset.type; 
             openAddModal(entityType);
         });
     });
@@ -610,14 +610,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('addSubmit').addEventListener('click', async () => {
-        const entityType = document.getElementById('addType').value; // password | file | gpg
+        const entityType = document.getElementById('addType').value; 
         const editId = document.getElementById('editId').value;
         const name = document.getElementById('addName').value;
 
         let payload;
         let response;
         if (entityType === 'password') {
-            const label = name; // treat main input as Label
+            const label = name; 
             const group = document.getElementById('addGroup').value || null;
             const address = document.getElementById('addAddress').value || null;
             const username = document.getElementById('addUsername').value || null;
@@ -703,7 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // GPG Keys - Generate new key pair
+    
     const generateGpgBtn = byId('generateGpgBtn');
     if (generateGpgBtn) {
         generateGpgBtn.addEventListener('click', () => {
@@ -716,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // GPG Keys - Generate submit
+    
     const generateGpgSubmit = byId('generateGpgSubmit');
     if (generateGpgSubmit) {
         generateGpgSubmit.addEventListener('click', async () => {
@@ -761,7 +761,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // GPG Keys - Delete key and Export key
+    
     byId('gpg-body').addEventListener('click', async (e) => {
         const deleteBtn = e.target.closest('.delete-gpg');
         const exportBtn = e.target.closest('.export-gpg');
@@ -791,7 +791,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // GPG Keys - Import key from file
+    
     const importGpgBtn = byId('importGpgBtn');
     if (importGpgBtn) {
         importGpgBtn.addEventListener('click', async () => {
@@ -806,13 +806,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Clipboard modal
+    
     let clipboardKeys = [];
     const openClipboardBtn = byId('openClipboardBtn');
     if (openClipboardBtn) {
         openClipboardBtn.addEventListener('click', async () => {
             const modal = new bootstrap.Modal(byId('clipboardModal'));
-            // Load GPG keys for select
+            
             const select = byId('clipboardKeySelect');
             select.innerHTML = '<option value="">-- Select a key --</option>';
             try {
@@ -830,16 +830,16 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
                 console.error('Failed to load GPG keys for clipboard:', err);
             }
-            // Clear fields
+            
             byId('clipboardInput').value = '';
             byId('clipboardOutput').value = '';
-            // Update button states
+            
             updateClipboardButtons();
             modal.show();
         });
     }
 
-    // Update clipboard buttons based on selected key type
+    
     function updateClipboardButtons() {
         const select = byId('clipboardKeySelect');
         const selectedOption = select.options[select.selectedIndex];
@@ -849,13 +849,13 @@ document.addEventListener('DOMContentLoaded', () => {
         byId('clipboardDecryptBtn').disabled = keyType !== 'private';
     }
 
-    // Key select change handler
+    
     const clipboardKeySelect = byId('clipboardKeySelect');
     if (clipboardKeySelect) {
         clipboardKeySelect.addEventListener('change', updateClipboardButtons);
     }
 
-    // Clipboard - Encrypt
+    
     const clipboardEncryptBtn = byId('clipboardEncryptBtn');
     if (clipboardEncryptBtn) {
         clipboardEncryptBtn.addEventListener('click', async () => {
@@ -890,7 +890,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Clipboard - Decrypt
+    
     const clipboardDecryptBtn = byId('clipboardDecryptBtn');
     if (clipboardDecryptBtn) {
         clipboardDecryptBtn.addEventListener('click', async () => {
@@ -925,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Clipboard - Copy output
+    
     const clipboardCopyBtn = byId('clipboardCopyBtn');
     if (clipboardCopyBtn) {
         clipboardCopyBtn.addEventListener('click', () => {
@@ -942,7 +942,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Clipboard - Clear
+    
     const clipboardClearBtn = byId('clipboardClearBtn');
     if (clipboardClearBtn) {
         clipboardClearBtn.addEventListener('click', () => {
