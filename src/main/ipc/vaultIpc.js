@@ -6,8 +6,8 @@ const VaultHandler = require('../handlers/vaultHandler');
 const { openVaultDB, closeCurrentDB, getCurrentDB } = require('../utils/db');
 const { setMasterPasswordForVault, validateMasterPasswordForVault } = require('../utils/auth');
 const { setCurrentSession, getCurrentSessionHandler, clearSession, getCurrentVaultPath } = require('../utils/session');
-const { run, get, all, ensureBaseTables, ensurePasswordColumns, ensureAuthColumns, ensureLoginAttemptsTable, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, deleteGpg, getGroups, addGroup, deleteGroup } = require('../utils/db');
-const LoginAttemptsManager = require('../utils/loginAttempts');
+const { run, get, all, ensureBaseTables, ensurePasswordColumns, ensureAuthColumns, checkpoint, optimize, ensureGroupByName, getPasswords, getFiles, getGpg, getCounts, addPassword, updatePassword, deletePassword, addFile, addGpg, deleteGpg, getGroups, addGroup, deleteGroup } = require('../utils/db');
+const LoginAttemptsManager = require('../modules/loginAttempts');
 
 const { generateGpgKeyPair, readAndValidateArmoredKey, encryptText, decryptText } = require('../utils/gpgUtils');
 
@@ -71,10 +71,9 @@ function registerVaultIpcHandlers(mainWindow) {
             
             
             await ensureAuthColumns(db);
-            await ensureLoginAttemptsTable(db);
             
-            
-            const attemptsManager = new LoginAttemptsManager(db);
+            // Initialize login attempts manager with vault path (stores data outside encrypted DB)
+            const attemptsManager = new LoginAttemptsManager(vaultPath);
             const lockStatus = await attemptsManager.checkLockout();
             
             if (lockStatus.locked) {
@@ -309,8 +308,7 @@ function registerVaultIpcHandlers(mainWindow) {
         try {
             const keys = await generateGpgKeyPair({
                 name: payload.userName,
-                email: payload.email || undefined,
-                expirationDays: payload.expirationDays || 0
+                email: payload.email || undefined
             });
             
             const userIdStr = payload.email

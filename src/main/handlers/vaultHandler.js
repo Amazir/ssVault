@@ -183,26 +183,16 @@ class VaultHandler {
                                                     console.log('Default group created');
                                                     
                                                     
-                                                    db.run('CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, last_attempt_time INTEGER, failed_count INTEGER DEFAULT 0, locked_until INTEGER DEFAULT 0)', (loginAttemptsErr) => {
-                                                        if (loginAttemptsErr) return reject(loginAttemptsErr);
-                                                        console.log('Table login_attempts created');
-                                                        
-                                                        db.run('INSERT INTO login_attempts (id, failed_count) VALUES (1, 0)', (initAttemptsErr) => {
-                                                            if (initAttemptsErr) return reject(initAttemptsErr);
-                                                            console.log('Login attempts initialized');
-                                                            
-                                                            db.run('PRAGMA wal_checkpoint(TRUNCATE)', (chkErr) => {
+                                                    db.run('PRAGMA wal_checkpoint(TRUNCATE)', (chkErr) => {
                                                                 if (chkErr) console.warn('Checkpoint error:', chkErr);
-                                                                console.log('Checkpoint done');
-                                                                db.close((closeErr) => {
-                                                                    if (closeErr) {
-                                                                        console.error('DB close error:', closeErr);
-                                                                        return reject(closeErr);
-                                                                    }
-                                                                    console.log('DB closed:', dbPath);
-                                                                    resolve(dbPath);
-                                                                });
-                                                            });
+                                                        console.log('Checkpoint done');
+                                                        db.close((closeErr) => {
+                                                            if (closeErr) {
+                                                                console.error('DB close error:', closeErr);
+                                                                return reject(closeErr);
+                                                            }
+                                                            console.log('DB closed:', dbPath);
+                                                            resolve(dbPath);
                                                         });
                                                     });
                                                 });
