@@ -39,7 +39,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.os }}-${{ matrix.arch || 'x64' }}-build
-          path: out/
+          path: out/make/
 
       - name: Report build sizes
         run: |
@@ -77,6 +77,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            out/**
+            out/make/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
