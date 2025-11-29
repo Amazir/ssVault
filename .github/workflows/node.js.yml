@@ -49,10 +49,33 @@ jobs:
       - name: Report build sizes
         run: |
           echo "Build artifacts sizes:"
-          find out -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" -o -name "*.zip" | while read file; do
-            size=$(du -h "$file" | cut -f1)
-            echo "$file: $size"
-          done
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            
+            function walk(dir) {
+              const files = fs.readdirSync(dir);
+              files.forEach(file => {
+                const fullPath = path.join(dir, file);
+                const stat = fs.statSync(fullPath);
+                
+                if (stat.isDirectory()) {
+                  walk(fullPath);
+                } else if (file.match(/\\.(exe|dmg|deb|rpm|zip)$/i)) {
+                  const sizeInBytes = stat.size;
+                  const sizeInKB = Math.round(sizeInBytes / 1024);
+                  const sizeInMB = (sizeInKB / 1024).toFixed(2);
+                  console.log(fullPath + ': ' + sizeInMB + ' MB (' + sizeInBytes + ' bytes)');
+                }
+              });
+            }
+            
+            if (fs.existsSync('out')) {
+              walk('out');
+            } else {
+              console.log('No out directory found');
+            }
+          "
 
       # Upload all generated artifacts from the out/ directory
       - name: Upload artifacts
