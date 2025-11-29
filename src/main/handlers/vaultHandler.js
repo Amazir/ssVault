@@ -220,29 +220,77 @@ class VaultHandler {
 
     async openVault() {
         try {
-            const encryptedData = fs.readFileSync(this.vaultPath); 
-            const decryptedZipBuffer = await this.decryptWithGPG(encryptedData);
+            const encryptedData = fs.readFileSync(this.vaultPath);
+
+            let decryptedZipBuffer;
+            try {
+                decryptedZipBuffer = await this.decryptWithGPG(encryptedData);
+            } catch (decryptErr) {
+                this.failedAttempts++;
+                const remainingAttempts = this.maxAttempts - this.failedAttempts;
+
+                // Sprawdź czy to błąd hasła
+                if (decryptErr.message &&
+                    (decryptErr.message.includes('Session key decryption failed') ||
+                        decryptErr.message.includes('decrypt') ||
+                        decryptErr.message.includes('password'))) {
+
+                    if (remainingAttempts > 0) {
+                        throw new Error(`Incorrect password. ${remainingAttempts} attempt(s) remaining.`);
+                    } else {
+                        // Opcjonalnie: zablokuj vault na jakiś czas
+                        throw new Error('Maximum password attempts exceeded. Vault access temporarily blocked.');
+                    }
+                } else {
+                    // Inny błąd (np. uszkodzony plik)
+                    throw new Error(`Failed to decrypt vault: ${decryptErr.message}`);
+                }
+            }
 
             const zip = new AdmZip(decryptedZipBuffer);
             zip.extractAllTo(this.tempDir, true);
             console.log('ZIP extracted to temp');
 
             const dbPath = path.join(this.tempDir, 'metadata.db');
-            if (!fs.existsSync(dbPath)) throw new Error('metadata.db not found in vault');
+            if (!fs.existsSync(dbPath)) {
+                throw new Error('Vault is corrupted: metadata.db not found');
+            }
 
-            await openVaultDB(dbPath, this.password);
+            try {
+                await openVaultDB(dbPath, this.password);
+            } catch (dbErr) {
+                this.failedAttempts++;
+                const remainingAttempts = this.maxAttempts - this.failedAttempts;
+
+                if (remainingAttempts > 0) {
+                    throw new Error(`Incorrect database password. ${remainingAttempts} attempt(s) remaining.`);
+                } else {
+                    throw new Error('Maximum password attempts exceeded. Vault access temporarily blocked.');
+                }
+            }
+
             console.log('DB opened from vault');
-            
-            
+
             await this.loadVaultKeys();
-            
-            
+
             this.fileManager = new FileManager(this.tempDir, this.vaultPublicKey, this.vaultPrivateKey, this.password);
+
+            this.failedAttempts = 0;
+
         } catch (err) {
             console.error('openVault error:', err);
             this.cleanTempDir();
             throw err;
         }
+    }
+
+    // ✅ Dodaj metodę do resetu licznika (np. po timeout)
+    resetFailedAttempts() {
+        this.failedAttempts = 0;
+    }
+
+    getFailedAttempts() {
+        return this.failedAttempts;
     }
     
     
