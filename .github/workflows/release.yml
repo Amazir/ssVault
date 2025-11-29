@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Make distributables (optimized)
+        run: npm run make
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Apply additional optimizations
+        run: |
+          node build-optimize.js || true
+
+      - name: Report build sizes
+        run: |
+          echo "Build artifacts sizes:"
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            
+            function walk(dir) {
+              const files = fs.readdirSync(dir);
+              files.forEach(file => {
+                const fullPath = path.join(dir, file);
+                const stat = fs.statSync(fullPath);
+                
+                if (stat.isDirectory()) {
+                  walk(fullPath);
+                } else if (file.match(/\\.(exe|dmg|deb|rpm|zip)$/i)) {
+                  const sizeInBytes = stat.size;
+                  const sizeInKB = Math.round(sizeInBytes / 1024);
+                  const sizeInMB = (sizeInKB / 1024).toFixed(2);
+                  console.log(fullPath + ': ' + sizeInMB + ' MB (' + sizeInBytes + ' bytes)');
+                }
+              });
+            }
+            
+            if (fs.existsSync('out')) {
+              walk('out');
+            } else {
+              console.log('No out directory found');
+            }
+          "
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            out/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

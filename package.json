@@ -47,7 +47,6 @@
   "dependencies": {
     "@journeyapps/sqlcipher": "^5.3.1",
     "adm-zip": "^0.5.16",
-    "asar": "^3.2.0",
     "bcrypt": "^6.0.0",
     "bootstrap": "^5.3.0",
     "electron-builder": "^26.0.12",
