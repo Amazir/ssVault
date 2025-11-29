@@ -383,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="mb-3">
                     <label for="addAddress" class="form-label">Address</label>
-                    <input type="text" class="form-control" id="addAddress" placeholder="https:
+                    <input type="text" class="form-control" id="addAddress" placeholder="URL">
                 </div>
                 <div class="mb-3">
                     <label for="addUsername" class="form-label">Username/E-Mail</label>
@@ -417,9 +417,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 const genBtn = document.getElementById('generatePasswordBtn');
                 if (genBtn) {
-                    genBtn.addEventListener('click', () => openPasswordGeneratorModal('addValue'));
+                    genBtn.removeEventListener('click', genBtn.clickHandler);
+                    genBtn.clickHandler = () => openPasswordGeneratorModal('addValue');
+                    genBtn.addEventListener('click', genBtn.clickHandler);
                 }
-            }, 0);
+            }, 100);
         } else if (entityType === 'file') {
             document.querySelector("label[for='addName']").textContent = 'File name (optional)';
             extra.innerHTML = `
@@ -450,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
             <div class="mb-3">
                 <label for="addAddress" class="form-label">Address</label>
-                <input type="text" class="form-control" id="addAddress" placeholder="https:
+                <input type="text" class="form-control" id="addAddress" placeholder="URL">
             </div>
             <div class="mb-3">
                 <label for="addUsername" class="form-label">Username/E-Mail</label>
@@ -484,9 +486,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const genBtn = document.getElementById('generatePasswordBtn');
             if (genBtn) {
-                genBtn.addEventListener('click', () => openPasswordGeneratorModal('addValue'));
+                genBtn.removeEventListener('click', genBtn.clickHandler);
+                genBtn.clickHandler = () => openPasswordGeneratorModal('addValue');
+                genBtn.addEventListener('click', genBtn.clickHandler);
             }
-        }, 0);
+        }, 100);
         modal.show();
     }
 

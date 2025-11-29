@@ -135,44 +135,48 @@ async function ensureBaseTables(db = getCurrentDB()) {
     await run(db, "CREATE TABLE IF NOT EXISTS files (id INTEGER PRIMARY KEY, name TEXT, path TEXT)");
     await run(db, "CREATE TABLE IF NOT EXISTS gpg (id INTEGER PRIMARY KEY, name TEXT, type TEXT)");
     await run(db, "CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY, name TEXT UNIQUE)");
-    await run(db, "CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, last_attempt_time INTEGER, failed_count INTEGER DEFAULT 0, locked_until INTEGER DEFAULT 0)");
     
     await run(db, "INSERT OR IGNORE INTO groups (id, name) VALUES (1, 'Default')");
-    
-    await run(db, "INSERT OR IGNORE INTO login_attempts (id, failed_count) VALUES (1, 0)");
 }
 
 async function ensurePasswordColumns(db = getCurrentDB()) {
     const cols = await all(db, 'PRAGMA table_info(passwords)');
     const have = (n) => cols.some(c => c.name === n);
     const alters = [];
-    if (!have('label')) alters.push('ALTER TABLE passwords ADD COLUMN label TEXT');
     
+    if (!have('label')) alters.push('ALTER TABLE passwords ADD COLUMN label TEXT');
     if (!have('group_id')) alters.push('ALTER TABLE passwords ADD COLUMN group_id INTEGER DEFAULT 1');
     if (!have('address')) alters.push('ALTER TABLE passwords ADD COLUMN address TEXT');
     if (!have('username')) alters.push('ALTER TABLE passwords ADD COLUMN username TEXT');
+    
     for (const sql of alters) {
         await run(db, sql);
     }
     
+    // Note: group_name column is deprecated but we don't remove it to avoid breaking old vaults
+    // New code should only use group_id
+}
+
+async function ensureFileColumns(db = getCurrentDB()) {
+    const cols = await all(db, 'PRAGMA table_info(files)');
+    const have = (n) => cols.some(c => c.name === n);
+    const alters = [];
     
-    if (have('group_name')) {
-        console.log('Migrating passwords with group_name to group_id...');
-        const passwordsWithGroupName = await all(db, 'SELECT id, group_name FROM passwords WHERE group_name IS NOT NULL AND group_id IS NULL');
-        for (const pwd of passwordsWithGroupName) {
-            const groupId = await ensureGroupByName(pwd.group_name, db);
-            if (groupId) {
-                await run(db, 'UPDATE passwords SET group_id = ? WHERE id = ?', [groupId, pwd.id]);
-            }
-        }
-        
-        await run(db, 'UPDATE passwords SET group_id = 1 WHERE group_id IS NULL');
+    if (!have('original_name')) alters.push('ALTER TABLE files ADD COLUMN original_name TEXT');
+    if (!have('size')) alters.push('ALTER TABLE files ADD COLUMN size INTEGER');
+    if (!have('hash')) alters.push('ALTER TABLE files ADD COLUMN hash TEXT');
+    if (!have('stored_filename')) alters.push('ALTER TABLE files ADD COLUMN stored_filename TEXT');
+    if (!have('added_date')) alters.push('ALTER TABLE files ADD COLUMN added_date TEXT');
+    
+    for (const sql of alters) {
+        await run(db, sql);
     }
 }
 
 async function ensureGpgColumns(db = getCurrentDB()) {
     const cols = await all(db, 'PRAGMA table_info(gpg)');
     const have = (n) => cols.some(c => c.name === n);
+    
     if (!have('content')) {
         await run(db, 'ALTER TABLE gpg ADD COLUMN content TEXT');
     }
@@ -190,11 +194,6 @@ async function ensureAuthColumns(db = getCurrentDB()) {
     for (const sql of alters) {
         await run(db, sql);
     }
-}
-
-async function ensureLoginAttemptsTable(db = getCurrentDB()) {
-    await run(db, 'CREATE TABLE IF NOT EXISTS login_attempts (id INTEGER PRIMARY KEY, last_attempt_time INTEGER, failed_count INTEGER DEFAULT 0, locked_until INTEGER DEFAULT 0)');
-    await run(db, 'INSERT OR IGNORE INTO login_attempts (id, failed_count) VALUES (1, 0)');
 }
 
 async function checkpoint(db = getCurrentDB()) {
@@ -348,9 +347,9 @@ module.exports = {
     all,
     ensureBaseTables,
     ensurePasswordColumns,
+    ensureFileColumns,
     ensureGpgColumns,
     ensureAuthColumns,
-    ensureLoginAttemptsTable,
     checkpoint,
     optimize,
     ensureGroupByName,

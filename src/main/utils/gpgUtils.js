@@ -6,7 +6,7 @@ openpgp.config.preferredSymmetricAlgorithm = openpgp.enums.symmetric.aes256;
 openpgp.config.preferredHashAlgorithm = openpgp.enums.hash.sha256;
 
 async function generateGpgKeyPair(options = {}) {
-  const { name = 'ssVault User', email, expirationDays = 0 } = options;
+  const { name = 'ssVault User', email } = options;
   
   const userIDs = [];
   if (email) {
@@ -15,7 +15,8 @@ async function generateGpgKeyPair(options = {}) {
     userIDs.push({ name });
   }
   
-  const keyExpirationTime = expirationDays > 0 ? expirationDays * 24 * 60 * 60 : 0;
+  // Note: expirationDays removed - OpenPGP.js doesn't store expiration in a retrievable way
+  // Keys are generated without expiration for vault use
   
   const { privateKey, publicKey } = await openpgp.generateKey({
     type: 'rsa',
@@ -23,7 +24,7 @@ async function generateGpgKeyPair(options = {}) {
     userIDs,
     passphrase: '',
     format: 'armored',
-    keyExpirationTime
+    keyExpirationTime: 0 // No expiration
   });
   
   return {
