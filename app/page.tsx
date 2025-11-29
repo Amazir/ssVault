@@ -8,7 +8,7 @@ export default function Home() {
         { version: "v0.0.1", date: "2025-10-30", changes: ["Pierwsza działająca kompilacja", "Częściowa funkcjonalność", "Brak obsługi kluczy GPG"] },
     ];
 
-    const logoPath = "/ssVault/logo-full.svg";
+    const logoPath = "/logo-full.svg";
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">

@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main # Wdrażaj przy pushu na gałąź main
+      - website # Wdrażaj tylko przy pushu na gałąź 'website'
 
 jobs:
   build-and-deploy:
