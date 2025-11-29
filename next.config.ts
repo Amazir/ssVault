@@ -1,6 +1,9 @@
+const isProd = process.env.NODE_ENV === 'production';
+
 const nextConfig = {
     output: 'export',
-    basePath: '/ssVault',
+    basePath: isProd ? '/ssVault' : '',
+    assetPrefix: isProd ? '/ssVault/' : '',
     images: {
         unoptimized: true,
     },
