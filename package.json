@@ -31,11 +31,27 @@
   "build": {
     "appId": "pl.edu.wszib.mromasze.ssvault",
     "productName": "ssVault",
+    "asar": true,
+    "files": [
+      "src/main/main.js",
+      "src/main/preload.js",
+      "src/renderer/**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{o,h,obj,py,cc,c,cpp}"
+    ],
     "directories": {
       "output": "dist"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "src/resources/images/icon/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
     "linux": {
       "target": "deb"
