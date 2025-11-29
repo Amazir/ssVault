@@ -1,7 +1,6 @@
 import React from 'react';
 import { Download, Shield, Zap, Terminal, ArrowRight, Github } from 'lucide-react';
 import Image from 'next/image';
-import nextConfig from '../../next.config';
 
 export default function Home() {
     const changelog = [
@@ -9,8 +8,7 @@ export default function Home() {
         { version: "v0.0.1", date: "2025-10-30", changes: ["Pierwsza działająca kompilacja", "Częściowa funkcjonalność", "Brak obsługi kluczy GPG"] },
     ];
 
-    const basePath = nextConfig.basePath || "";
-    const logoPath = `${basePath}/logo-full.svg`;
+    const logoPath = "/logo-full.svg";
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
