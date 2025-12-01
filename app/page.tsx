@@ -59,7 +59,7 @@ export default function Home() {
                     </h1>
                     <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
                         ssVault to lekkie narzędzie open-source do szyfrowania danych.
-                        Stworzone z myślą o prywatności i szybkości działania.
+                        Stworzone z myślą o dostępności dla każdego, prywatności i szybkości działania.
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -78,10 +78,15 @@ export default function Home() {
             <section id="features" className="py-20 bg-slate-900/50">
                 <div className="max-w-6xl mx-auto px-4">
                     <h2 className="text-3xl font-bold text-white mb-12 text-center">Dlaczego ssVault?</h2>
-                    <div className="grid md:grid-cols-3 gap-8">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <FeatureCard
+                            icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h4"/></svg>}
+                            title="Minimalistyczność"
+                            desc="Prosty i intuicyjny interfejs, który pozwala skupić się na tym, co najważniejsze - bezpieczeństwie Twoich danych."
+                        />
                         <FeatureCard
                             icon={<Shield className="text-emerald-400" />}
-                            title="Prywatność First"
+                            title="Prywatność"
                             desc="Twoje dane nie opuszczają urządzenia bez Twojej zgody. Pełna kontrola nad lokalizacją zapisu."
                         />
                         <FeatureCard
@@ -91,8 +96,18 @@ export default function Home() {
                         />
                         <FeatureCard
                             icon={<Terminal className="text-purple-400" />}
-                            title="Open Source"
-                            desc="Pełna przejrzystość kodu. Możesz audytować, modyfikować i ulepszać ssVault razem z nami."
+                            title="Open source"
+                            desc="Pełna przejrzystystość kodu. Możesz audytować, modyfikować i ulepszać ssVault razem z nami."
+                        />
+                        <FeatureCard
+                            icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>}
+                            title="Zaawansowane szyfrowanie"
+                            desc="Wykorzystanie standardu OpenPGP gwarantuje najwyższy poziom bezpieczeństwa dla Twoich danych."
+                        />
+                        <FeatureCard
+                            icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12.5 15.5h-5"/><path d="M12.5 12.5h-5"/><path d="m9 9.5-2.5 2.5 2.5 2.5"/></svg>}
+                            title="Wszechstronność użycia"
+                            desc="Szyfruj całe pliki lub przechowuj bezpiecznie swoje hasła i notatki w jednym miejscu."
                         />
                     </div>
                 </div>
@@ -137,6 +152,7 @@ export default function Home() {
                 </div>
             </footer>
         </div>
+
     );
 }
 
